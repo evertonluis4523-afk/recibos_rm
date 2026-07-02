@@ -1,6 +1,6 @@
 /* Recibos RM — service worker
    Para forçar atualização nos dispositivos, suba o número da versão (v1 -> v2). */
-const CACHE = 'recibos-rm-v24';
+const CACHE = 'recibos-rm-v25';
 const ASSETS = [
   './',
   './index.html',
