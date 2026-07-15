@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>RM Estruturas — Controle de Recibos</title>
+<meta name="theme-color" content="#1d2127">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Recibos RM">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Firebase (carregado só se configurado) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<!-- PDF Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+:root{
+  --red:#aa221f; --red-d:#7d1714; --red-soft:#fbeceb;
+  --gray:#585758; --ink:#1d2127; --muted:#6c7480;
+  --line:#dadee3; --line-2:#eceef1; --bg:#eef0f2; --surface:#ffffff;
+  --ok:#1f7a4d; --ok-soft:#e8f3ec; --warn:#b4690e; --warn-soft:#fbf0e1;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"Archivo",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --shadow:0 1px 2px rgba(20,24,32,.06),0 8px 24px rgba(20,24,32,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--sans);color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+input,textarea,select{font-family:inherit;color:inherit}
+.mono{font-family:var(--mono)}
+
+/* App bar */
+.appbar{position:sticky;top:0;z-index:40;background:var(--ink);color:#fff;border-bottom:3px solid var(--red)}
+.appbar .in{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:9px 18px;flex-wrap:wrap}
+.appbar .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;font-size:13px}
+.appbar .brand b{color:var(--red);font-weight:800}
+.appbar .dot{width:7px;height:7px;background:var(--red);transform:rotate(45deg)}
+.appbar .spacer{flex:1}
+.appbar .who{font-size:11px;letter-spacing:.04em;color:#aeb4bd;display:flex;align-items:center;gap:7px}
+.appbar .who .g{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.btn{border:1px solid #3a4049;background:#2a2f37;color:#fff;border-radius:7px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.12s}
+.btn:hover{background:#363c45;border-color:#4a515b}
+.btn.primary{background:var(--red);border-color:var(--red)}
+.btn.primary:hover{background:var(--red-d)}
+.btn.ghost{background:transparent}
+
+/* Sheet */
+.wrap{max-width:1180px;margin:22px auto;padding:0 18px 90px}
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:26px 30px 20px;border-bottom:1px solid var(--line);position:relative}
+.head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:linear-gradient(90deg,var(--red) 0 33%,var(--gray) 33% 66%,var(--red) 66% 100%)}
+.head .logo img{height:74px;display:block}
+.head .co{text-align:right;font-size:12.5px;color:var(--muted);line-height:1.5}
+.head .co .nm{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:.02em;margin-bottom:2px}
+.head .co .mut{font-family:var(--mono);font-size:11.5px}
+.doc-tag{display:inline-block;margin-top:6px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:700}
+
+/* Tabs */
+.viewtabs{display:flex;gap:2px;padding:0 30px;border-bottom:1px solid var(--line);background:#f7f8f9;flex-wrap:wrap}
+.vtab{border:0;background:none;padding:14px 16px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.02em;display:inline-flex;align-items:center;gap:7px}
+.vtab:hover{color:var(--ink)}
+.vtab.on{color:var(--red);border-bottom-color:var(--red)}
+.view{display:none}
+.view.on{display:block}
+
+/* Dashboard cards */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid var(--line)}
+.card{padding:16px 20px;border-right:1px solid var(--line-2)}
+.card:last-child{border-right:0}
+.card .k{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.card .v{font-family:var(--mono);font-size:21px;font-weight:700}
+.card .s{font-size:11px;color:var(--muted);margin-top:3px}
+.card.afa .v{color:var(--warn)} .card.sem .v{color:var(--red)} .card.atv .v{color:var(--ok)}
+.dotk{width:8px;height:8px;border-radius:50%}
+.dotk.w{background:var(--warn)} .dotk.r{background:var(--red)} .dotk.g{background:var(--ok)} .dotk.b{background:var(--ink)}
+
+/* Add/form zone */
+.addzone{padding:18px 30px 6px}
+.section-lab{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 13px;display:flex;align-items:center;gap:8px}
+.section-lab .ln{flex:1;height:1px;background:var(--line-2)}
+.form-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:11px}
+.f{display:flex;flex-direction:column;gap:5px}
+.f .lab{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.f input,.f select{width:100%;border:1.5px solid var(--line);border-radius:9px;padding:9px 11px;font-size:14px;font-weight:600;background:#fafbfc;transition:.12s}
+.f input::placeholder{color:#b7bcc4;font-weight:500}
+.f input:focus,.f select:focus{outline:0;border-color:var(--red);background:#fff;box-shadow:0 0 0 3px var(--red-soft)}
+.span2{grid-column:span 2}.span3{grid-column:span 3}.span4{grid-column:span 4}.span6{grid-column:span 6}.span12{grid-column:span 12}
+.addbtns{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.btn-act{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;padding:10px 16px;font-size:13.5px;font-weight:700;cursor:pointer;transition:.12s}
+.btn-act:hover{border-color:var(--gray)}
+.btn-act.save{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-act.save:hover{background:var(--red-d)}
+.btn-act.dim{color:var(--gray)}
+
+/* Segmented */
+.seg{display:flex;background:#fafbfc;border:1.5px solid var(--line);border-radius:9px;padding:3px;gap:3px}
+.seg button{flex:1;background:none;border:none;color:var(--muted);font-weight:700;padding:8px;border-radius:6px;font-size:13.5px;cursor:pointer;transition:.12s}
+.seg button.on{background:var(--red);color:#fff}
+
+/* Filters */
+.filters{display:flex;gap:10px;align-items:center;padding:14px 30px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fafbfc;flex-wrap:wrap}
+.filters .fi{display:flex;flex-direction:column;gap:4px}
+.filters .fi .lab{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.filters select,.filters input{border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600;background:#fff}
+.filters select:focus,.filters input:focus{outline:0;border-color:var(--red);box-shadow:0 0 0 2px var(--red-soft)}
+.filters .grow{flex:1;min-width:150px}
+.filters .grow input{width:100%}
+
+/* Table */
+.tbl-wrap{overflow-x:auto}
+table.list{width:100%;border-collapse:collapse;font-size:13px}
+table.list th{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:left;padding:11px 30px;border-bottom:1.5px solid var(--line);white-space:nowrap;background:#fff}
+table.list td{padding:11px 30px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+table.list tr:hover td{background:#fafbfc}
+table.list td.r,table.list th.r{text-align:right}
+table.list td.c,table.list th.c{text-align:center}
+.idx{font-family:var(--mono);color:#aeb4bd;font-size:12px}
+.forn{font-weight:700}
+.sub{font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--mono)}
+.sub.miss{color:var(--red)}
+.val{font-family:var(--mono);font-weight:700}
+.row-off td{opacity:.45}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:20px;letter-spacing:.02em;white-space:nowrap}
+.badge.atv{background:var(--ok-soft);color:var(--ok)}
+.badge.afa{background:var(--warn-soft);color:var(--warn)}
+.badge .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+.chk{width:18px;height:18px;accent-color:var(--red);cursor:pointer}
+.vinp{width:118px;border:1.5px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13.5px;font-weight:700;text-align:right;font-family:var(--mono);background:#fafbfc}
+.vinp:focus{outline:0;border-color:var(--red);background:#fff;box-shadow:0 0 0 3px var(--red-soft)}
+.vinp.zero{border-color:var(--warn);background:var(--warn-soft)}
+.cur{font-family:var(--mono);color:var(--muted);font-size:12px;margin-right:5px}
+.rowact{display:flex;gap:4px;justify-content:flex-end}
+.ia{border:0;background:none;color:#aeb4bd;cursor:pointer;padding:6px;border-radius:7px;line-height:1;font-size:14px;transition:.12s}
+.ia:hover{background:#f1f2f4;color:var(--ink)}
+.ia.del:hover{color:var(--red);background:var(--red-soft)}
+.empty{text-align:center;color:var(--muted);padding:40px 20px}
+.empty b{display:block;color:var(--gray);font-size:14px;margin-bottom:3px}
+
+.sheetfoot{border-top:1px solid var(--line);padding:14px 30px;font-size:11px;color:#9aa1aa;display:flex;justify-content:space-between;letter-spacing:.02em;flex-wrap:wrap;gap:8px;align-items:center}
+.sheetfoot .tot b{color:var(--ink);font-family:var(--mono)}
+
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(20,24,32,.55);z-index:60;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+.overlay.open{display:flex}
+.modal{background:#fff;width:100%;max-width:560px;border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden}
+.modal .mhead{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);background:var(--ink);color:#fff}
+.modal .mhead h2{font-size:15px;margin:0;letter-spacing:.03em;font-weight:700}
+.modal .mhead .x{margin-left:auto;border:0;background:#2a2f37;color:#fff;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:18px;line-height:1}
+.modal .mhead .x:hover{background:var(--red)}
+.mbody{padding:22px;max-height:70vh;overflow:auto}
+.mfoot{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;background:#fafbfc}
+
+/* Login */
+.login{position:fixed;inset:0;z-index:90;background:var(--ink);display:flex;align-items:center;justify-content:center;padding:24px}
+.login.hide{display:none}
+.login::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 50% at 80% 0%,rgba(170,34,31,.22),transparent 60%),radial-gradient(50% 40% at 0% 100%,rgba(170,34,31,.14),transparent 55%)}
+.login-card{position:relative;width:100%;max-width:380px;background:var(--surface);border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5);border-top:4px solid var(--red)}
+.login-card .lc-head{padding:30px 30px 22px;text-align:center;border-bottom:1px solid var(--line);position:relative}
+.login-card .lc-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:linear-gradient(90deg,var(--red) 0 33%,var(--gray) 33% 66%,var(--red) 66% 100%)}
+.login-card .lc-head img{height:62px;margin-bottom:14px}
+.login-card .lc-head .ttl{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:800}
+.login-card .lc-head .sub{font-size:12px;color:var(--muted);margin-top:4px}
+.login-card .lc-body{padding:26px 30px 30px}
+.login-card .lc-body .f{margin-bottom:14px}
+.login-card .lc-body .submit{width:100%;margin-top:6px;justify-content:center;padding:12px}
+.login-err{display:none;background:var(--red-soft);color:var(--red-d);border:1px solid #f1c9c7;border-radius:9px;padding:10px 12px;font-size:12.5px;font-weight:600;margin-bottom:14px}
+.login-err.on{display:block}
+.login-mode{margin-top:16px;text-align:center;font-size:11px;color:var(--muted)}
+.login-mode b{font-weight:700}
+.syncpill{font-size:10px;letter-spacing:.05em;display:inline-flex;align-items:center;gap:6px;color:#aeb4bd}
+.syncpill .led{width:7px;height:7px;border-radius:50%;background:#6c7480}
+.syncpill.on .led{background:#3fbf6b;box-shadow:0 0 0 3px rgba(63,191,107,.2)}
+.syncpill.local .led{background:#b4690e}
+@media (max-width:560px){.hide-sm{display:none}}
+
+.msel{border:1.5px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12.5px;font-weight:700;background:#fafbfc;cursor:pointer}
+.msel:focus{outline:0;border-color:var(--red);box-shadow:0 0 0 2px var(--red-soft)}
+.msel.bc{color:var(--ok);border-color:#bfe0cd;background:var(--ok-soft)}
+.msel.pf{color:var(--warn);border-color:#f0d9b6;background:var(--warn-soft)}
+#salTable.hide-det th.det,#salTable.hide-det td.det{display:none}
+.obsinp{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12.5px;font-weight:500;font-family:var(--sans);background:#fafbfc;resize:none;overflow:hidden;height:36px;line-height:1.35;white-space:nowrap}
+.obsinp::placeholder{color:#b7bcc4}
+.obsinp:focus{outline:0;border-color:var(--red);background:#fff;box-shadow:0 0 0 3px var(--red-soft)}
+.obsinp.exp{white-space:pre-wrap}
+
+.fchip{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1.5px solid var(--line);border-radius:20px;padding:5px 6px 5px 13px;font-size:12.5px;font-weight:600;color:var(--ink)}
+.fchip button{border:0;background:#f1f2f4;color:#9aa1aa;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+.fchip button:hover{background:var(--red-soft);color:var(--red)}
+
+.sortbox{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:linear-gradient(180deg,#fff,#fafbfc);border:1.5px solid var(--line);border-radius:12px;padding:16px 20px;margin:0 30px}
+.sortname{font-family:var(--mono);font-size:22px;font-weight:700;flex:1;min-width:180px;color:var(--muted);letter-spacing:.02em;transition:.1s}
+.sortname.spin{color:var(--ink)}
+.sortname.winner{color:var(--ok);transform:scale(1.02)}
+.btn-tog{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;letter-spacing:.02em;cursor:pointer;border:1.5px solid transparent;transition:.12s}
+.btn-tog .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+.btn-tog.atv{background:var(--ok-soft);color:var(--ok);border-color:#bfe0cd}
+.btn-tog.afa{background:var(--warn-soft);color:var(--warn);border-color:#f0d9b6}
+.btn-tog:hover{filter:brightness(.97)}
+
+/* Toast */
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:.25s;z-index:100;max-width:90vw;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{border-left:4px solid var(--ok)} #toast.err{border-left:4px solid var(--red)}
+
+/* Print preview */
+.print-ov{display:none;position:fixed;inset:0;background:#4b4f55;z-index:80;flex-direction:column}
+.print-ov.open{display:flex}
+.print-bar{background:var(--ink);color:#fff;border-bottom:3px solid var(--red);padding:11px 20px;display:flex;align-items:center;gap:14px}
+.print-bar .ttl{font-weight:700;letter-spacing:.03em}
+.print-bar .info{font-family:var(--mono);font-size:12px;color:#aeb4bd}
+.print-bar .spacer{flex:1}
+.print-scroll{flex:1;overflow:auto;padding:28px;display:flex;flex-direction:column;align-items:center;gap:22px}
+
+.folha{width:210mm;min-height:297mm;background:#fff;box-shadow:0 4px 22px rgba(0,0,0,.35);padding:13mm 16mm;display:flex;flex-direction:column}
+.recibo{position:relative;height:126mm;display:flex;flex-direction:column;border:1.5px solid #d3d3cd;border-radius:4px;padding:6mm 13mm 5mm;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#1d2127}
+.recibo .wm{position:absolute;inset:0;background-position:center;background-repeat:no-repeat;background-size:60%;opacity:.045;pointer-events:none}
+.recibo .num{position:absolute;top:8px;right:12px;font-size:9pt;color:#9aa1aa;font-family:Arial;letter-spacing:.5px}
+.recibo .top{text-align:center;position:relative;margin:0 0 1.5mm}
+.recibo .top img{height:12mm;display:inline-block}
+.recibo .titulo{text-align:center;font-weight:700;font-size:12pt;letter-spacing:2px;color:#aa221f;margin:0 0 3mm;position:relative}
+.recibo .corpo{font-size:9.7pt;line-height:1.4;text-align:justify;margin:0;position:relative}
+.recibo .obs{font-size:10.5pt;font-style:italic;color:#3a3f47;margin:3.5mm 0 0;position:relative;text-align:left;line-height:1.45;white-space:pre-line}
+.recibo .obs strong{font-style:normal}
+.recibo .data{font-size:9.7pt;text-align:center;margin:3mm 0 3.5mm;position:relative}
+.recibo .ass{margin-top:9mm;text-align:center;position:relative}
+.recibo .ass .linha{border-top:1.5px solid #555;width:70%;margin:0 auto 3px}
+.recibo .ass .nm{font-weight:700;font-size:10pt;letter-spacing:.5px}
+.recibo .ass .dc{font-size:8.5pt;color:#6c7480;font-family:Arial;margin-top:1px}
+.cutline{border-top:1.5px dashed #bbb;position:relative;margin:0 -17mm;height:0}
+.recibo .detrec{width:100%;border-collapse:collapse;margin:2.5mm 0 0;font-size:8.6pt;position:relative}
+.recibo .detrec td{padding:0.45mm 0;border-bottom:.2mm dotted #cfcfca;line-height:1.15}
+.recibo .detrec td.v{text-align:right;font-family:Arial,Helvetica,sans-serif;white-space:nowrap;padding-left:10mm}
+.recibo .detrec tr.tot td{border-top:.4mm solid #888;border-bottom:0;font-weight:700;padding-top:1mm;font-size:9.7pt}
+.recibo .obs{font-size:9pt;color:#444;margin:2mm 0 0;position:relative;line-height:1.3}
+.cutline span{position:absolute;right:6mm;top:-8px;background:#fff;padding:0 7px;font-size:8pt;color:#aaa;font-family:Arial}
+
+@media (max-width:820px){
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .card:nth-child(2n){border-right:0}
+  .head{flex-direction:column;align-items:flex-start}
+  .head .co{text-align:left}
+  table.list th,table.list td{padding-left:18px;padding-right:18px}
+  .folha{width:100%;min-height:auto;padding:12mm}.recibo{height:auto;min-height:120mm}
+}
+
+@media print{
+  @page{size:A4;margin:0}
+  body{background:#fff}
+  .appbar,.wrap,.overlay,.print-bar,#toast{display:none !important}
+  .print-ov{position:static;display:block !important;background:#fff}
+  .print-scroll{display:block;padding:0;overflow:visible;gap:0}
+  .folha{width:auto;min-height:auto;box-shadow:none;margin:0;padding:5mm 14mm;page-break-after:always}
+  .folha:last-child{page-break-after:auto}
+  .recibo{height:126mm}
+}
+</style>
+</head>
+<body>
+
+<div class="appbar"><div class="in">
+  <div class="brand"><span class="dot"></span><b>RM</b> · Controle de Recibos</div>
+  <div class="spacer"></div>
+  <span class="syncpill" id="syncPill"><span class="led"></span><span id="syncTxt">local</span></span>
+  <span class="who hide-sm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aeb4bd" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><b id="whoLabel">—</b></span>
+  <button class="btn primary" id="abInstall" style="display:none">⤓ Instalar app</button>
+  <button class="btn ghost" id="abExport">Backup</button>
+  <button class="btn" id="abLogout" title="Sair"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="hide-sm">Sair</span></button>
+</div></div>
+
+<!-- LOGIN -->
+<div class="login" id="loginScreen">
+  <div class="login-card">
+    <div class="lc-head">
+      <img id="loginLogo" alt="RM Estruturas">
+      <div class="ttl">Controle de Recibos</div>
+      <div class="sub">Acesso restrito · RM Estruturas</div>
+    </div>
+    <div class="lc-body">
+      <div class="login-err" id="loginErr"></div>
+      <div class="f"><span class="lab">Usuário / E-mail</span>
+        <input id="li_user" type="text" autocomplete="username" placeholder="seu usuário" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="f"><span class="lab">Senha</span>
+        <input id="li_pass" type="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn-act save submit" id="loginBtn" onclick="doLogin()">Entrar</button>
+      <div class="login-mode" id="loginMode"></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="sheet">
+    <div class="head">
+      <div class="logo"><img id="logoImg" alt="RM Estruturas Pré-Fabricadas"></div>
+      <div class="co">
+        <div class="nm">RM Estruturas Pré-Fabricadas</div>
+        <div class="mut">CNPJ 28.654.965/0001-17 · 51 99789-7879</div>
+        <div>Rod RSC 453, KM 42 nº 6151, Pavilhão 2, Sala 2</div>
+        <div>Novo Paraíso · Estrela/RS · 95883-000</div>
+        <div class="doc-tag">Controle de Recibos</div>
+      </div>
+    </div>
+
+    <div class="viewtabs">
+      <button class="vtab on" data-v="func">Funcionários</button>
+      <button class="vtab" data-v="lanc">Lançamento</button>
+      <button class="vtab" data-v="sal">Salários</button>
+      <button class="vtab" data-v="assid">Assiduidade/Rancho</button>
+      <button class="vtab" data-v="terc">Terceiros</button>
+      <button class="vtab" data-v="terclanc">Recibos Terceiros</button>
+      <button class="vtab" data-v="cli">Recibos Clientes</button>
+      <button class="vtab" data-v="empr">Empréstimos</button>
+      <button class="vtab" data-v="rel">Relatório</button>
+      <button class="vtab" data-v="emp">Empresa</button>
+    </div>
+
+    <!-- FUNCIONÁRIOS -->
+    <div class="view on" id="v-func">
+      <div class="cards">
+        <div class="card"><div class="k"><span class="dotk b"></span>Cadastrados</div><div class="v" id="cTot">0</div></div>
+        <div class="card atv"><div class="k"><span class="dotk g"></span>Ativos</div><div class="v" id="cAtv">0</div></div>
+        <div class="card afa"><div class="k"><span class="dotk w"></span>Afastados</div><div class="v" id="cAfa">0</div></div>
+        <div class="card sem"><div class="k"><span class="dotk r"></span>Sem CPF</div><div class="v" id="cSem">0</div></div>
+      </div>
+      <div class="filters">
+        <div class="fi grow"><span class="lab">Buscar</span><input id="fSearch" placeholder="nome ou CPF"></div>
+        <div class="fi"><span class="lab">Situação</span>
+          <select id="fStatus"><option value="all">Todas</option><option value="ativo">Ativos</option><option value="afast">Afastados</option></select>
+        </div>
+        <button class="btn-act dim" id="btnImport" style="align-self:flex-end">Importar lista</button>
+        <button class="btn-act save" id="btnAdd" style="align-self:flex-end">＋ Novo funcionário</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th style="width:34px">#</th><th>Funcionário</th><th>CPF / CNPJ</th><th>Situação</th><th class="r">Ações</th></tr></thead>
+          <tbody id="empBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LANÇAMENTO -->
+    <div class="view" id="v-lanc">
+      <div class="addzone">
+        <div class="section-lab">Dados do recibo <span class="ln"></span></div>
+        <div class="form-grid">
+          <div class="f span3"><span class="lab">Tipo</span>
+            <div class="seg" id="tipoSeg"><button data-t="pagamento" class="on">Pagamento</button><button data-t="adiantamento">Adiantamento</button></div>
+          </div>
+          <div class="f span3"><span class="lab">Mês de referência</span>
+            <div style="display:flex;gap:8px"><select id="mesRef" style="flex:1"></select><input id="anoRef" class="mono" type="number" min="2020" max="2099" style="width:84px"></div>
+          </div>
+          <div class="f span3"><span class="lab">Data de emissão</span><input id="dataEmissao" type="date"></div>
+          <div class="f span3"><span class="lab">Cidade (emissão)</span><input id="cidadeEmissao" placeholder="Estrela"></div>
+        </div>
+      </div>
+      <div class="filters">
+        <div class="section-lab" style="margin:0;flex:1">Valores por funcionário · afastados já vêm desmarcados <span class="ln"></span></div>
+        <button class="btn-act dim" id="btnMarcarTodos">Marcar todos</button>
+        <button class="btn-act dim" id="btnDesmarcarTodos">Desmarcar todos</button>
+        <button class="btn-act dim" id="btnMarcar">Marcar ativos</button>
+        <button class="btn-act dim" id="btnAplicar">Aplicar valor a todos</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th class="c" style="width:64px">Imprimir</th><th>Funcionário</th><th class="r" style="width:170px">Valor (R$)</th></tr></thead>
+          <tbody id="valBody"></tbody>
+        </table>
+      </div>
+      <div class="sheetfoot">
+        <span class="tot">Incluídos: <b id="tQtd">0</b> &nbsp;·&nbsp; Total: <b id="tVal">R$ 0,00</b></span>
+        <button class="btn-act save" id="btnGerar">Visualizar / Imprimir →</button>
+      </div>
+    </div>
+
+    <!-- SALÁRIOS -->
+    <div class="view" id="v-sal">
+      <div class="addzone">
+        <div class="section-lab">Competência e datas de pagamento <span class="ln"></span></div>
+        <div class="form-grid">
+          <div class="f span3"><span class="lab">Mês competência</span><select id="salMes"></select></div>
+          <div class="f span2"><span class="lab">Ano</span><input id="salAno" class="mono" type="number" min="2020" max="2099"></div>
+          <div class="f span3"><span class="lab">Adiantamento (dia 15)</span><input id="salDataAdiant" type="date"></div>
+          <div class="f span3"><span class="lab">Pagamento (dia 01)</span><input id="salDataPagto" type="date"></div>
+        </div>
+      </div>
+      <div class="cards" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card atv"><div class="k"><span class="dotk g"></span>Adiant. · Banco</div><div class="v" id="salAdBanco">R$ 0,00</div><div class="s">a depositar</div></div>
+        <div class="card afa"><div class="k"><span class="dotk w"></span>Adiant. · PF</div><div class="v" id="salAdPF">R$ 0,00</div><div class="s">em espécie</div></div>
+        <div class="card atv"><div class="k"><span class="dotk g"></span>Pagto · Banco</div><div class="v" id="salPgBanco">R$ 0,00</div><div class="s">a depositar</div></div>
+        <div class="card afa"><div class="k"><span class="dotk w"></span>Pagto · PF</div><div class="v" id="salPgPF">R$ 0,00</div><div class="s">em espécie</div></div>
+      </div>
+      <div class="filters">
+        <div class="seg" id="salSeg" style="max-width:300px"><button data-m="todos" class="on">Todos</button><button data-m="banco">Banco</button><button data-m="pf">PF</button></div>
+        <div class="fi grow"><span class="lab">Buscar</span><input id="salSearch" placeholder="nome"></div>
+        <label class="fi" style="flex-direction:row;align-items:center;gap:6px;align-self:flex-end;font-size:12.5px;font-weight:700;cursor:pointer"><input type="checkbox" id="salDetalhado"> Cálculo detalhado</label>
+        <div class="fi"><span class="lab">Adiant. %</span><input id="salPct" class="mono" value="50" style="width:62px"></div>
+        <button class="btn-act dim" id="btnSalAuto" style="align-self:flex-end">Adiant. = % do salário</button>
+        <button class="btn-act dim" id="btnSalResto" style="align-self:flex-end">Pagto = salário − adiant.</button>
+        <button class="btn-act dim" id="btnSalDet" style="align-self:flex-end">Detalhar pagamento</button>
+        <button class="btn-act save" id="btnImportXlsx" style="align-self:flex-end">⭳ Importar Excel</button>
+        <input type="file" id="xlsxFile" accept=".xlsx,.xls" style="display:none">
+      </div>
+      <div class="tbl-wrap">
+        <table class="list" id="salTable">
+          <thead><tr><th>Funcionário</th><th class="c" style="width:100px">Método</th><th class="r" style="width:120px">Salário fixo</th><th class="r" style="width:120px">Adiantamento</th><th class="r det" style="width:120px">Base líq.</th><th class="r det" style="width:110px">Desc. RM</th><th class="r det" style="width:105px">Banheiro</th><th class="r det" style="width:110px">Acréscimos</th><th class="r det" style="width:110px">Almoços</th><th class="r" style="width:130px">Pagamento</th><th style="min-width:180px">Observação</th></tr></thead>
+          <tbody id="salBody"></tbody>
+        </table>
+      </div>
+      <div class="sheetfoot">
+        <span class="tot">Total salários: <b id="salTotFixo">R$ 0,00</b></span>
+        <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--gray)"><input type="checkbox" id="chkDetRec"> Detalhar valores no recibo</label>
+        <span style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-act save" id="btnGerarAdiant">Recibos adiantamento →</button>
+          <button class="btn-act save" id="btnGerarPagto">Recibos pagamento →</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- ASSIDUIDADE / RANCHO -->
+    <div class="view" id="v-assid">
+      <div class="addzone">
+        <div class="section-lab">Mês e valor do prêmio <span class="ln"></span></div>
+        <div class="form-grid">
+          <div class="f span3"><span class="lab">Mês</span><select id="asMes"></select></div>
+          <div class="f span2"><span class="lab">Ano</span><input id="asAno" class="mono" type="number" min="2020" max="2099"></div>
+          <div class="f span3"><span class="lab">Valor de cada prêmio (R$)</span><input id="asPremio" class="mono" placeholder="170,00"></div>
+        </div>
+      </div>
+      <div class="cards" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card atv"><div class="k"><span class="dotk g"></span>Assíduos</div><div class="v" id="asAssiduos">0</div><div class="s">1 prêmio + 1 rancho</div></div>
+        <div class="card afa"><div class="k"><span class="dotk w"></span>Faltaram</div><div class="v" id="asFaltaram">0</div><div class="s">concorrem ao sorteio</div></div>
+        <div class="card"><div class="k"><span class="dotk b"></span>Total prêmios</div><div class="v" id="asTotPremio">R$ 0,00</div></div>
+        <div class="card sem"><div class="k"><span class="dotk r"></span>Ranchos</div><div class="v" id="asRanchos">0</div><div class="s">assíduos + 1 sorteado</div></div>
+      </div>
+      <div class="addzone" style="padding-bottom:0">
+        <div class="section-lab">Rancho extra — sorteio entre quem faltou <span class="ln"></span></div>
+      </div>
+      <div class="sortbox">
+        <div class="sortname" id="asSortNome">—</div>
+        <button class="btn-act save" id="btnSortear">🎲 Sortear rancho extra</button>
+      </div>
+      <div class="filters">
+        <div class="section-lab" style="margin:0;flex:1">Marque quem faltou no mês <span class="ln"></span></div>
+        <button class="btn-act dim" id="btnAsTodosAssid">Marcar todos assíduos</button>
+        <button class="btn-act dim" id="btnAsTodosFalta">Desmarcar todos</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th>Funcionário</th><th class="c" style="width:150px">Situação no mês</th><th>Ganha</th></tr></thead>
+          <tbody id="assidBody"></tbody>
+        </table>
+      </div>
+      <div class="sheetfoot"><span>Cada mês guarda seus próprios dados — troque o mês no topo.</span></div>
+    </div>
+
+    <!-- TERCEIROS (CADASTRO) -->
+    <div class="view" id="v-terc">
+      <div class="cards">
+        <div class="card"><div class="k"><span class="dotk b"></span>Terceiros</div><div class="v" id="tcTot">0</div></div>
+        <div class="card atv"><div class="k"><span class="dotk g"></span>Com CPF</div><div class="v" id="tcCpf">0</div></div>
+        <div class="card afa"><div class="k"><span class="dotk w"></span>Com CNPJ</div><div class="v" id="tcCnpj">0</div></div>
+        <div class="card sem"><div class="k"><span class="dotk r"></span>Sem documento</div><div class="v" id="tcSem">0</div></div>
+      </div>
+      <div class="filters">
+        <div class="fi grow"><span class="lab">Buscar</span><input id="tfSearch" placeholder="nome, empresa, documento ou serviço"></div>
+        <button class="btn-act save" id="btnTAdd" style="align-self:flex-end">＋ Novo terceiro</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th style="width:34px">#</th><th>Nome / Empresa</th><th>CPF / CNPJ</th><th>Tipo de serviço</th><th class="r">Ações</th></tr></thead>
+          <tbody id="tercBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RECIBOS TERCEIROS (EMISSÃO) -->
+    <div class="view" id="v-terclanc">
+      <div class="addzone">
+        <div class="section-lab">Dados do recibo <span class="ln"></span></div>
+        <div class="form-grid">
+          <div class="f span4"><span class="lab">Data de emissão</span><input id="tDataEmissao" type="date"></div>
+          <div class="f span4"><span class="lab">Cidade (emissão)</span><input id="tCidadeEmissao" placeholder="Estrela"></div>
+        </div>
+      </div>
+      <div class="filters">
+        <div class="section-lab" style="margin:0;flex:1">Marque quem vai receber, ajuste valor e serviço <span class="ln"></span></div>
+        <button class="btn-act dim" id="btnTMarcar">Marcar todos</button>
+        <button class="btn-act dim" id="btnTLimpar">Limpar marcação</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th class="c" style="width:64px">Imprimir</th><th>Nome / Empresa</th><th style="min-width:200px">Tipo de serviço</th><th class="r" style="width:160px">Valor (R$)</th></tr></thead>
+          <tbody id="tercValBody"></tbody>
+        </table>
+      </div>
+      <div class="sheetfoot">
+        <span class="tot">Incluídos: <b id="ttQtd">0</b> &nbsp;·&nbsp; Total: <b id="ttVal">R$ 0,00</b></span>
+        <button class="btn-act save" id="btnTGerar">Visualizar / Imprimir →</button>
+      </div>
+    </div>
+
+    <!-- RECIBOS CLIENTES -->
+    <div class="view" id="v-cli">
+      <div class="addzone">
+        <div class="section-lab">Recibo de valor recebido de cliente <span class="ln"></span></div>
+        <div class="form-grid">
+          <div class="f span6"><span class="lab">Cliente (nome ou empresa)</span><input id="cliNome" placeholder="Ex: Airton José Dieter"></div>
+          <div class="f span2"><span class="lab">Tipo doc.</span><select id="cliDocTipo"><option>CPF</option><option>CNPJ</option></select></div>
+          <div class="f span4"><span class="lab">Número</span><input id="cliDoc" class="mono" placeholder="000.000.000-00"></div>
+          <div class="f span3"><span class="lab">Valor (R$)</span><input id="cliValor" class="mono" placeholder="0,00" inputmode="decimal"></div>
+          <div class="f span9"><span class="lab">Referente a</span><input id="cliDesc" placeholder="Ex: pagamento de estrutura metálica"></div>
+          <div class="f span3"><span class="lab">Data de emissão</span><input id="cliData" type="date"></div>
+          <div class="f span3"><span class="lab">Cidade (emissão)</span><input id="cliCidade" placeholder="Estrela"></div>
+        </div>
+        <div class="addbtns">
+          <button class="btn-act save" id="btnCliGerar">Gerar / Imprimir recibo →</button>
+          <button class="btn-act dim" id="btnCliLimpar">Limpar campos</button>
+        </div>
+      </div>
+      <div class="filters"><div class="section-lab" style="margin:0;flex:1">Recibos emitidos <span class="ln"></span></div><div class="fi grow"><span class="lab">Buscar</span><input id="cliSearch" placeholder="cliente, documento ou referência"></div></div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th style="width:56px">Nº</th><th>Cliente</th><th>Referente a</th><th class="r">Valor</th><th class="c">Data</th><th class="r">Ações</th></tr></thead>
+          <tbody id="cliBody"></tbody>
+        </table>
+      </div>
+      <div class="sheetfoot"><span class="tot">Recibos emitidos: <b id="cliQtd">0</b> &nbsp;·&nbsp; Total recebido: <b id="cliTot">R$ 0,00</b></span></div>
+    </div>
+
+    <!-- EMPRÉSTIMOS -->
+    <div class="view" id="v-empr">
+      <div class="addzone">
+        <div class="section-lab">Novo empréstimo <span class="ln"></span></div>
+        <div class="form-grid">
+          <div class="f span6"><span class="lab">Funcionário</span>
+            <select id="emprFunc" style="width:100%;border:1.5px solid var(--line);border-radius:9px;padding:9px 11px;font-size:14px;font-weight:600;background:#fafbfc">
+              <option value="">— selecione —</option>
+            </select>
+          </div>
+          <div class="f span3"><span class="lab">Valor total (R$)</span><input id="emprValor" class="mono" placeholder="0,00" inputmode="decimal"></div>
+          <div class="f span3"><span class="lab">Parcelas</span><input id="emprParc" class="mono" type="number" min="1" max="60" value="5" style="width:100%;border:1.5px solid var(--line);border-radius:9px;padding:9px 11px;font-size:14px;font-weight:600;background:#fafbfc"></div>
+        </div>
+        <div class="form-grid">
+          <div class="f span4"><span class="lab">Data do empréstimo</span><input id="emprData" type="date"></div>
+          <div class="f span4"><span class="lab">Descrição</span><input id="emprDesc" placeholder="Ex: telha, ferramenta..." style="width:100%;border:1.5px solid var(--line);border-radius:9px;padding:9px 11px;font-size:14px;font-weight:600;background:#fafbfc"></div>
+          <div class="f span4"><span class="lab">Onde descontar</span>
+            <select id="emprDesde" style="width:100%;border:1.5px solid var(--line);border-radius:9px;padding:9px 11px;font-size:14px;font-weight:600;background:#fafbfc">
+              <option value="adiantamento">Adiantamento</option>
+              <option value="pagamento">Pagamento</option>
+            </select>
+          </div>
+        </div>
+        <div class="addbtns">
+          <button class="btn-act save" id="btnEmprSalvar">＋ Registrar empréstimo</button>
+        </div>
+      </div>
+      <div class="filters"><div class="section-lab" style="margin:0;flex:1">Empréstimos cadastrados <span class="ln"></span></div><div class="fi grow"><span class="lab">Filtrar</span><input id="emprSearch" placeholder="funcionário ou descrição"></div></div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th>Funcionário</th><th>Descrição</th><th class="r">Valor total</th><th class="r">Pago</th><th class="r">Saldo</th><th class="c">Parcelas</th><th class="r">Ações</th></tr></thead>
+          <tbody id="emprBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RELATÓRIO -->
+    <div class="view" id="v-rel">
+      <div class="addzone">
+        <div class="section-lab">Relatório de valores pagos <span class="ln"></span></div>
+        <div class="form-grid">
+          <div class="f span3"><span class="lab">Ano</span><select id="relAno"></select></div>
+        </div>
+      </div>
+      <div class="cards" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card"><div class="k"><span class="dotk b"></span>Total no ano</div><div class="v" id="relTotAno">R$ 0,00</div></div>
+        <div class="card atv"><div class="k"><span class="dotk g"></span>Via banco</div><div class="v" id="relTotBanco">R$ 0,00</div></div>
+        <div class="card afa"><div class="k"><span class="dotk w"></span>Em espécie (PF)</div><div class="v" id="relTotPF">R$ 0,00</div></div>
+        <div class="card"><div class="k"><span class="dotk r"></span>Terceiros</div><div class="v" id="relTotTerc">R$ 0,00</div></div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th>Mês</th><th>Tipo</th><th class="c">Qtd</th><th class="r">Banco</th><th class="r">Espécie (PF)</th><th class="r">Total</th><th class="r">Ações</th></tr></thead>
+          <tbody id="relBody"></tbody>
+        </table>
+      </div>
+      <div class="sheetfoot"><span>Os pagamentos são registrados aqui automaticamente quando você gera os recibos.</span></div>
+    </div>
+
+    <!-- EMPRESA -->
+    <div class="view" id="v-emp">
+      <div class="addzone">
+        <div class="section-lab">Dados que aparecem no corpo do recibo <span class="ln"></span></div>
+        <div class="form-grid">
+          <div class="f span12"><span class="lab">Razão social</span><input id="cfgRazao"></div>
+          <div class="f span12"><span class="lab">Endereço</span><input id="cfgEndereco"></div>
+          <div class="f span6"><span class="lab">Cidade / UF</span><input id="cfgCidade"></div>
+          <div class="f span6"><span class="lab">CNPJ</span><input id="cfgCnpj" class="mono"></div>
+        </div>
+        <div class="addbtns"><button class="btn-act save" id="btnSalvarCfg">Salvar dados</button></div>
+        <div class="section-lab" style="margin-top:24px">Funções <span class="ln"></span></div>
+        <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px">Estas funções aparecem no cadastro do funcionário.</p>
+        <div class="form-grid"><div class="f span8"><span class="lab">Nova função</span><input id="cfgNovaFuncao" placeholder="Ex: Eletricista" onkeydown="if(event.key==='Enter')document.getElementById('btnAddFuncao').click()"></div><div class="f span4" style="justify-content:flex-end"><button class="btn-act save" id="btnAddFuncao" style="align-self:flex-end">＋ Adicionar função</button></div></div>
+        <div id="funcoesList" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px"></div>
+        <div class="section-lab" style="margin-top:24px">Zerar valores do mês <span class="ln"></span></div>
+        <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px">Depois de gerar os recibos, limpe os valores digitados para começar o próximo mês do zero. (O relatório já guardou o histórico.)</p>
+        <div class="addbtns">
+          <button class="btn-act dim" id="btnZerarAdiant">Zerar adiantamentos</button>
+          <button class="btn-act dim" id="btnZerarPagto">Zerar pagamentos</button>
+          <button class="btn-act dim" id="btnZerarAmbos" style="color:var(--red);border-color:var(--red-soft)">Zerar adiant. + pagto</button>
+        </div>
+
+        <div class="section-lab" style="margin-top:24px">Backup <span class="ln"></span></div>
+        <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px">Os dados ficam salvos neste navegador. Exporte para guardar ou levar a outro computador.</p>
+        <div class="addbtns">
+          <button class="btn-act" id="btnExport2">Exportar (.json)</button>
+          <button class="btn-act" id="btnRestore">Restaurar backup</button>
+          <button class="btn-act dim" id="btnReset" style="color:var(--red);border-color:var(--red-soft)">Apagar tudo</button>
+          <input type="file" id="fileImport" accept="application/json" style="display:none">
+        </div>
+      </div>
+      <div class="sheetfoot"><span>RM Estruturas Pré-Fabricadas · Controle interno de recibos</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORTAR EXCEL -->
+<div class="overlay" id="impXlsxModal"><div class="modal" style="max-width:860px">
+  <div class="mhead"><h2>Importar planilha da contabilidade</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody">
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="f span4"><span class="lab">Aba da planilha</span><select id="xlsxSheet"></select></div>
+      <div class="f span8"><span class="lab">Trazer para o app</span>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:600;padding-top:6px">
+          <label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="optSal" checked> Salário</label>
+          <label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="optAd" checked> Adiantamento</label>
+          <label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="optPg" checked> Base líquida</label>
+          <label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="optMet" checked> Método (Banco/Dinheiro)</label>
+        </div>
+      </div>
+    </div>
+    <div id="xlsxSummary" class="sub" style="margin-bottom:8px"></div>
+    <div class="tbl-wrap" style="max-height:44vh;overflow:auto"><table class="list" style="font-size:12.5px">
+      <thead><tr><th>Nome na planilha</th><th>Funcionário no app</th><th class="r">Salário</th><th class="r">Adiant.</th><th class="r">Base líq.</th><th class="c">Método</th></tr></thead>
+      <tbody id="xlsxBody"></tbody></table></div>
+  </div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Cancelar</button><button class="btn-act save" id="xlsxApply">Importar valores</button></div>
+</div></div>
+
+<!-- MODAL RELATÓRIO (DETALHES) -->
+<div class="overlay" id="relModal"><div class="modal">
+  <div class="mhead"><h2 id="relmTitle">Detalhes</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody"><div class="tbl-wrap"><table class="list" style="font-size:12.5px"><thead><tr><th>Nome</th><th class="c">Método</th><th class="r">Valor</th></tr></thead><tbody id="relmBody"></tbody></table></div></div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Fechar</button></div>
+</div></div>
+
+<!-- MODAL TERCEIRO -->
+<div class="overlay" id="tercModal"><div class="modal">
+  <div class="mhead"><h2 id="tmTitle">Novo terceiro</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody"><div class="form-grid">
+    <div class="f span12"><span class="lab">Nome / Empresa</span><input id="tmNome" placeholder="Ex: Serralheria Lenhard ou João da Silva"></div>
+    <div class="f span4"><span class="lab">Tipo doc.</span><select id="tmDocTipo"><option>CNPJ</option><option>CPF</option></select></div>
+    <div class="f span8"><span class="lab">Número</span><input id="tmDoc" class="mono" placeholder="00.000.000/0000-00"></div>
+    <div class="f span12"><span class="lab">Tipo de serviço</span><input id="tmServico" placeholder="Ex: Locação de equipamento, mão de obra, frete..."></div>
+    <div class="f span12"><span class="lab">Valor padrão (opcional, R$)</span><input id="tmValor" class="mono" placeholder="0,00"></div>
+  </div></div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Cancelar</button><button class="btn-act save" id="tmSave">Salvar</button></div>
+</div></div>
+
+<!-- MODAL FUNCIONÁRIO -->
+<div class="overlay" id="empModal"><div class="modal">
+  <div class="mhead"><h2 id="mTitle">Novo funcionário</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody"><div class="form-grid">
+    <div class="f span12"><span class="lab">Nome completo</span><input id="mNome" placeholder="Ex: Adriano Roloff"></div>
+    <div class="f span12"><span class="lab">Função</span><select id="mFuncao"></select></div>
+    <div class="f span4"><span class="lab">Tipo doc.</span><select id="mDocTipo"><option>CPF</option><option>CNPJ</option></select></div>
+    <div class="f span8"><span class="lab">Número</span><input id="mDoc" class="mono" placeholder="000.000.000-00"></div>
+    <div class="f span12"><span class="lab">Situação</span><select id="mStatus"><option value="ativo">Ativo</option><option value="afast">Afastado (não imprime por padrão)</option></select></div>
+    <div class="f span6"><span class="lab">Início de contratação</span><input id="mDtInicio" type="date"></div>
+    <div class="f span6"><span class="lab">Assinatura da carteira</span><input id="mDtCarteira" type="date"></div>
+  </div></div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Cancelar</button><button class="btn-act save" id="mSave">Salvar</button></div>
+</div></div>
+
+<!-- MODAL IMPORTAR -->
+<div class="overlay" id="impModal"><div class="modal">
+  <div class="mhead"><h2>Importar lista de nomes</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody">
+    <p style="color:var(--muted);font-size:12.5px;margin:0 0 10px">Um nome por linha. CPF e situação você ajusta depois.</p>
+    <textarea id="impText" rows="9" style="width:100%;border:1.5px solid var(--line);border-radius:9px;padding:11px;font-family:var(--mono);font-size:13px" placeholder="ADRIANO ROLOFF&#10;ALDOMIR DA ROSA"></textarea>
+  </div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Cancelar</button><button class="btn-act save" id="impSave">Importar</button></div>
+</div></div>
+
+<!-- MODAL APLICAR -->
+<div class="overlay" id="aplModal"><div class="modal" style="max-width:380px">
+  <div class="mhead"><h2>Aplicar valor</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody"><div class="f"><span class="lab">Valor para todos os incluídos (R$)</span><input id="aplVal" class="mono" placeholder="0,00"></div></div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Cancelar</button><button class="btn-act save" id="aplSave">Aplicar</button></div>
+</div></div>
+
+<!-- MODAL DETALHES EMPRÉSTIMO -->
+<div class="overlay" id="emprModal"><div class="modal" style="max-width:720px">
+  <div class="mhead"><h2 id="emprMTitle">Detalhes do empréstimo</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody">
+    <div class="tbl-wrap" style="max-height:50vh;overflow:auto">
+      <table class="list" style="font-size:12.5px">
+        <thead><tr><th>Parcela</th><th>Vencimento</th><th class="r">Valor</th><th class="c">Status</th><th class="r">Ações</th></tr></thead>
+        <tbody id="emprParcsBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Fechar</button><button class="btn-act" id="btnEmprDel" style="color:var(--red);border-color:var(--red-soft)">Excluir empréstimo</button></div>
+</div></div>
+
+<!-- PRINT -->
+<div class="print-ov" id="printOv">
+  <div class="print-bar"><span class="ttl">Pré-visualização</span><span class="info" id="printInfo"></span><div class="spacer"></div>
+    <button class="btn ghost" id="printClose">Fechar</button><button class="btn primary" id="printNow">🖨️ Imprimir</button></div>
+  <div class="print-scroll" id="printScroll"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const LOGO="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAggAAADFCAYAAAAxFQogAADWM0lEQVR4nOx9eZwdVZX/95xbVa+3hEUB0aQ76cQBg8v8jDPjMvoSZ1RUlCWp150ExBXcEMd9f3mMjvsC4wYiiJCk+z0WQUZRR5N23zKuxC3ppDsICi5AentVdc/5/VFVnU7Se7rzXkh9P5/6QPrVcqvq1r3nnvM930PIkCFDhqMAClAF4JPyoFU9sATowfvcunTpKcNsH8VKbQpdTMCpAjoJqieCqIWABlUYAlRJI1IMKbAPhL+S6r1K5h4m7QNpvxvS3ef29d1/8DWKAK/K5/m+nh71ARmvHdMAAVDf901k8P+AMaSi9zPxgwp9EIQHIXiQQH8F8Bdl/QuAv4jInyuVygPjndD3fXPvvffSySefrJVKRTC7dmXIMAqqdQMyZMiQYSKkRgEAFAA79rebWltPtUYfC/CTiOnxovIYUjxSiB7uEZEhimfh5Ew6wXRJBFAyFIoqLIBQJGCiexV6lwI7mPjnbPELDoI7z7v77r+OPb4MGACYqbFQLBa5VCppR6Gja8GCBYWRkRGICIgIREl7RKCq6TZMoL+Iyt0g/JaVfyEkvwrD8Le33HLLXQefPzUYVq1aJaVSSZEZDBlmiMxAyJAhQ11hIqPg9tbWEwaY/5lYnkXA01XpjJyhZpcIqkCkigjxJC/xZCgHnZoOHvD0gP/E+wAgBsgQwSGCk/wQqCJQ/SsRfqGC75DS1pHh4Z++6M9/HkwPTo2FQnztqSZkAgDf911D5vUgvNFxnJODIBAiigAYVSWKrQVKDQdmBjMDiA2IKIqGiej3Cv05gB8R0U8WLly446qrrhoaezHf9w0ArFixQkul0sHPJkOGQ5AZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDFjgBNHQKHj9ThoKQQBQCCcYjII4IBUFVFpNpHQI8BbiWLb40NSRTzcNADKR1qqIyLc889d5HneW8h0EWO4+SCIBAAICJO2xQ3TJWIJPl/TgDDBiAgDEOIyF4CbQfjO8aYHtd173zuuutGRttWLPK2bds48S5kxkKGcZEZCBkyZKgLFAFGHlzqQZT+7ab29pMt7L8TcI5An+ERn+ISIYIiFIWk9gDF
