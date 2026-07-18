@@ -390,6 +390,10 @@ table.list td.c,table.list th.c{text-align:center}
           <div class="f span3"><span class="lab">Adiantamento (dia 15)</span><input id="salDataAdiant" type="date"></div>
           <div class="f span3"><span class="lab">Pagamento (dia 01)</span><input id="salDataPagto" type="date"></div>
         </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px">
+          <span id="salFechStatus" style="font-size:12px;color:var(--muted)"></span>
+          <button class="btn-act dim" id="btnVerFechamentos">📁 Ver fechamentos da competência</button>
+        </div>
       </div>
       <div class="cards" style="grid-template-columns:repeat(4,1fr)">
         <div class="card atv"><div class="k"><span class="dotk g"></span>Adiant. · Banco</div><div class="v" id="salAdBanco">R$ 0,00</div><div class="s">a depositar</div></div>
@@ -419,6 +423,8 @@ table.list td.c,table.list th.c{text-align:center}
         <span class="tot">Total salários: <b id="salTotFixo">R$ 0,00</b></span>
         <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--gray)"><input type="checkbox" id="chkDetRec"> Detalhar valores no recibo</label>
         <span style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-act dim" id="btnFecharAdiant" style="color:var(--gray)" title="Arquiva os valores de adiantamento da competência selecionada e limpa os campos pro próximo mês">🔒 Fechar Adiantamento</button>
+          <button class="btn-act dim" id="btnFecharPagto" style="color:var(--gray)" title="Arquiva os valores de pagamento da competência selecionada e limpa os campos pro próximo mês">🔒 Fechar Pagamento</button>
           <button class="btn-act save" id="btnGerarAdiant">Recibos adiantamento →</button>
           <button class="btn-act save" id="btnGerarPagto">Recibos pagamento →</button>
         </span>
@@ -837,6 +843,20 @@ table.list td.c,table.list th.c{text-align:center}
   <div class="mfoot"><button class="btn-act dim" data-close>Cancelar</button><button class="btn-act save" id="almImportApply">Aplicar selecionados</button></div>
 </div></div>
 
+<!-- MODAL FECHAMENTOS -->
+<div class="overlay" id="fechModal"><div class="modal" style="max-width:820px">
+  <div class="mhead"><h2 id="fechTitle">Fechamentos da competência</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody">
+    <div class="section-lab">Adiantamento <span class="ln"></span></div>
+    <div id="fechAdiantInfo" style="font-size:12.5px;color:var(--muted);margin-bottom:14px"></div>
+    <div class="tbl-wrap" style="max-height:26vh;overflow:auto;margin-bottom:18px"><table class="list" style="font-size:12px"><thead><tr><th>Funcionário</th><th class="c">Método</th><th class="r">Salário</th><th class="r">Adiantamento</th></tr></thead><tbody id="fechAdiantBody"></tbody></table></div>
+    <div class="section-lab">Pagamento <span class="ln"></span></div>
+    <div id="fechPagtoInfo" style="font-size:12.5px;color:var(--muted);margin-bottom:14px"></div>
+    <div class="tbl-wrap" style="max-height:26vh;overflow:auto"><table class="list" style="font-size:12px"><thead><tr><th>Funcionário</th><th class="c">Método</th><th class="r">Base líq.</th><th class="r">Almoços</th><th class="r">Pagamento</th></tr></thead><tbody id="fechPagtoBody"></tbody></table></div>
+  </div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Fechar</button></div>
+</div></div>
+
 <!-- PRINT -->
 <div class="print-ov" id="printOv">
   <div class="print-bar"><span class="ttl">Pré-visualização</span><span class="info" id="printInfo"></span><div class="spacer"></div>
@@ -893,7 +913,7 @@ const SEED=[
 ["SEBASTIÃO DA SILVA","564.086.090-15"]
 ];
 
-let state={cfg:{...DEFAULT_CFG},employees:[],terceiros:[],clientes:[],historico:{},assiduidade:{},bancoHoras:{},gen:{tipo:"pagamento",excluded:{}},genT:{checked:{}}};
+let state={cfg:{...DEFAULT_CFG},employees:[],terceiros:[],clientes:[],historico:{},assiduidade:{},bancoHoras:{},fechamentos:{},gen:{tipo:"pagamento",excluded:{}},genT:{checked:{}}};
 let RCTX={tipo:"pagamento",mesIdx:0,ano:"",dataISO:"",cidade:""};
 function cliToMap(){const m={};state.clientes.forEach((c,i)=>{m[c.id]={nome:c.nome,docTipo:c.docTipo,doc:c.doc||"",valor:Number(c.valor)||0,descricao:c.descricao||"",data:c.data||"",cidade:c.cidade||"",numero:c.numero||(i+1),ts:c.ts||0};});return m;}
 function mapToCli(m){return Object.keys(m||{}).map(id=>Object.assign({id},m[id])).sort((a,b)=>(b.ts||0)-(a.ts||0));}
@@ -911,7 +931,7 @@ loadGen();
 function empsToMap(){const m={};state.employees.forEach((e,i)=>{m[e.id]={nome:e.nome,docTipo:e.docTipo,doc:e.doc||"",status:e.status,funcao:e.funcao||"",banco:e.banco||"",dtInicio:e.dtInicio||"",dtCarteira:e.dtCarteira||"",salario:Number(e.salario)||0,metodo:e.metodo||"banco",obs:e.obs||"",base:Number(e.base)||0,descRM:Number(e.descRM)||0,acresc:Number(e.acresc)||0,banheiro:Number(e.banheiro)||0,almoco:Number(e.almoco)||0,he:Number(e.he)||0,faltas:Number(e.faltas)||0,plano:Number(e.plano)||0,inss:Number(e.inss)||0,econ:Number(e.econ)||0,adicional:Number(e.adicional)||0,desconto:Number(e.desconto)||0,adiantBase:Number(e.adiantBase)||0,valPagamento:Number(e.valPagamento)||0,valAdiantamento:Number(e.valAdiantamento)||0,emprestimos:e.emprestimos||[],historicoSalario:e.historicoSalario||[],ord:(e.ord!=null?e.ord:i)};});return m;}
 function mapToEmps(m){return Object.keys(m||{}).map(id=>Object.assign({id},m[id])).sort((a,b)=>(a.ord||0)-(b.ord||0));}
 function seedDefault(){return SEED.map((p,i)=>({id:"e"+i,nome:p[0],docTipo:"CPF",doc:p[1],status:"ativo",funcao:"",banco:"",dtInicio:"",dtCarteira:"",salario:0,metodo:"banco",obs:"",base:0,descRM:0,acresc:0,banheiro:0,almoco:0,he:0,faltas:0,plano:0,inss:0,econ:0,valPagamento:0,valAdiantamento:0,ord:i}));}
-function applyData(v){v=v||{};state.cfg={...DEFAULT_CFG,...(v.cfg||{})};state.employees=v.employees?mapToEmps(v.employees):[];state.employees.forEach(e=>{if(!e.emprestimos)e.emprestimos=[];if(!e.historicoSalario)e.historicoSalario=[];});state.terceiros=v.terceiros?mapToTerc(v.terceiros):[];state.historico=v.historico||{};state.assiduidade=v.assiduidade||{};state.bancoHoras=v.bancoHoras||{};state.clientes=v.clientes?mapToCli(v.clientes):[];}
+function applyData(v){v=v||{};state.cfg={...DEFAULT_CFG,...(v.cfg||{})};state.employees=v.employees?mapToEmps(v.employees):[];state.employees.forEach(e=>{if(!e.emprestimos)e.emprestimos=[];if(!e.historicoSalario)e.historicoSalario=[];});state.terceiros=v.terceiros?mapToTerc(v.terceiros):[];state.historico=v.historico||{};state.assiduidade=v.assiduidade||{};state.bancoHoras=v.bancoHoras||{};state.fechamentos=v.fechamentos||{};state.clientes=v.clientes?mapToCli(v.clientes):[];}
 
 function normCfg(){if(!Array.isArray(state.cfg.funcoes))state.cfg.funcoes=state.cfg.funcoes?Object.values(state.cfg.funcoes):[...DEFAULT_CFG.funcoes];if(!Array.isArray(state.cfg.bancos))state.cfg.bancos=state.cfg.bancos?Object.values(state.cfg.bancos):[...DEFAULT_CFG.bancos];}
 function bootUI(){ normCfg(); loadCfg(); renderEmps(); renderTerc(); if($('#v-lanc').classList.contains('on')) renderLanc(); if($('#v-sal').classList.contains('on')) renderSal(); if($('#v-empr').classList.contains('on')) renderEmpr(); if($('#v-assid').classList.contains('on')) renderAssid(); if($('#v-terclanc').classList.contains('on')) renderTercLanc(); if($('#v-rel').classList.contains('on')) renderRel(); if($('#v-bh').classList.contains('on')) renderBH(); if($('#v-cli').classList.contains('on')) renderCli(); }
@@ -926,17 +946,17 @@ function startData(){
     }, err=>{ toast('Erro de leitura: '+err.message,'err'); });
   }else{
     const raw=store.load();
-    if(raw && raw.employees){ state.cfg={...DEFAULT_CFG,...raw.cfg}; state.employees=raw.employees.map((e,i)=>({ord:i,...e})); state.employees.forEach(e=>{if(!e.emprestimos)e.emprestimos=[];if(!e.historicoSalario)e.historicoSalario=[];}); state.terceiros=(raw.terceiros||[]).map((t,i)=>({ord:i,...t})); state.historico=raw.historico||{}; state.assiduidade=raw.assiduidade||{};state.bancoHoras=raw.bancoHoras||{}; state.clientes=(raw.clientes||[]).map(c=>({...c})); }
+    if(raw && raw.employees){ state.cfg={...DEFAULT_CFG,...raw.cfg}; state.employees=raw.employees.map((e,i)=>({ord:i,...e})); state.employees.forEach(e=>{if(!e.emprestimos)e.emprestimos=[];if(!e.historicoSalario)e.historicoSalario=[];}); state.terceiros=(raw.terceiros||[]).map((t,i)=>({ord:i,...t})); state.historico=raw.historico||{}; state.assiduidade=raw.assiduidade||{};state.bancoHoras=raw.bancoHoras||{}; state.fechamentos=raw.fechamentos||{}; state.clientes=(raw.clientes||[]).map(c=>({...c})); }
     else { state.cfg={...DEFAULT_CFG}; state.employees=seedDefault(); persist(); }
     bootUI();
   }
 }
 function persist(){
   if(useFirebase){
-    fb.db.ref(DB_NODE).set({employees:empsToMap(),terceiros:tercToMap(),clientes:cliToMap(),historico:state.historico,assiduidade:state.assiduidade,bancoHoras:state.bancoHoras,cfg:state.cfg}).catch(e=>toast('Erro ao salvar: '+e.message,'err'));
+    fb.db.ref(DB_NODE).set({employees:empsToMap(),terceiros:tercToMap(),clientes:cliToMap(),historico:state.historico,assiduidade:state.assiduidade,bancoHoras:state.bancoHoras,fechamentos:state.fechamentos,cfg:state.cfg}).catch(e=>toast('Erro ao salvar: '+e.message,'err'));
     publishDiretorio();
   }
-  else { store.save({employees:state.employees,terceiros:state.terceiros,clientes:state.clientes,historico:state.historico,assiduidade:state.assiduidade,bancoHoras:state.bancoHoras,cfg:state.cfg}); }
+  else { store.save({employees:state.employees,terceiros:state.terceiros,clientes:state.clientes,historico:state.historico,assiduidade:state.assiduidade,bancoHoras:state.bancoHoras,fechamentos:state.fechamentos,cfg:state.cfg}); }
 }
 // Publica só nome/função/data de início (nada de salário, banco ou documento)
 // num nó separado, de leitura aberta, pra outros sistemas internos (ex:
@@ -1353,6 +1373,7 @@ function salTotals(){let adB=0,adP=0,pgB=0,pgP=0,fixo=0;empAtivos().forEach(e=>{
 function renderSal(){
   const ms=$('#salMes');if(!ms.options.length)MESES.forEach((m,i)=>{const o=el('option');o.value=i;o.textContent=m.charAt(0).toUpperCase()+m.slice(1);ms.appendChild(o);});
   if($('#salAno').value===''){const n=new Date();ms.value=n.getMonth();$('#salAno').value=n.getFullYear();recomputeSalDates();}
+  atualizarSalFechStatus();
   document.querySelectorAll('#salSeg button').forEach(x=>x.classList.toggle('on',x.dataset.m===salFilter));
   const cd=$('#chkDetRec');if(cd)cd.checked=!!state.cfg.detalharRecibo;
   const q=($('#salSearch').value||'').toLowerCase(),b=$('#salBody');b.innerHTML='';
@@ -1387,8 +1408,8 @@ function renderSal(){
 }
 document.querySelectorAll('#salSeg button').forEach(x=>x.onclick=()=>{salFilter=x.dataset.m;renderSal();});
 $('#salSearch').oninput=renderSal;
-$('#salMes').onchange=()=>{recomputeSalDates();};
-$('#salAno').onchange=()=>{recomputeSalDates();};
+$('#salMes').onchange=()=>{recomputeSalDates();atualizarSalFechStatus();};
+$('#salAno').onchange=()=>{recomputeSalDates();atualizarSalFechStatus();};
 $('#btnSalAuto').onclick=()=>{const pct=parseValor($('#salPct').value)||0;if(pct<=0){toast('Informe a % do adiantamento','err');return;}
   const y=parseInt($('#salAno').value,10), m=parseInt($('#salMes').value,10);
   let prop=0;
@@ -1420,6 +1441,67 @@ function salMesKey(){
   if(isNaN(m)||!y) return '';
   return y+'-'+String(m+1).padStart(2,'0');
 }
+
+/* ---------- Fechamento mensal (adiantamento / pagamento) ---------- */
+// Arquiva uma cópia completa dos valores atuais de todos os funcionários
+// (não é travado — dá pra fechar de novo e substituir, ou continuar
+// editando o mês normalmente) e limpa os campos de trabalho pro próximo
+// mês, igual aos botões "Zerar" da aba Empresa, só que já vinculado à
+// competência selecionada.
+function fecharCompetencia(tipo){
+  const key=salMesKey();
+  if(!key){ alert('Escolha o mês e o ano da competência primeiro.'); return; }
+  const rotulo=MESES[parseInt($('#salMes').value,10)]+'/'+$('#salAno').value;
+  const fkey=key+'-'+tipo;
+  const label=tipo==='adiantamento'?'adiantamento':'pagamento';
+  if(state.fechamentos[fkey] && !confirm('Já existe um fechamento de '+label+' para '+rotulo+'. Fechar de novo substitui o arquivo anterior. Continuar?')) return;
+  if(!confirm('Fechar o '+label+' de '+rotulo+'?\n\nIsso arquiva os valores atuais de todos os funcionários e limpa os campos pra você começar o próximo mês do zero.')) return;
+  const itens=state.employees.map(e=>tipo==='adiantamento'?{
+    id:e.id,nome:e.nome,metodo:e.metodo||'banco',salario:Number(e.salario)||0,
+    adiantBase:Number(e.adiantBase)||0,adicional:Number(e.adicional)||0,desconto:Number(e.desconto)||0,
+    valAdiantamento:Number(e.valAdiantamento)||0
+  }:{
+    id:e.id,nome:e.nome,metodo:e.metodo||'banco',salario:Number(e.salario)||0,
+    base:Number(e.base)||0,descRM:Number(e.descRM)||0,banheiro:Number(e.banheiro)||0,acresc:Number(e.acresc)||0,
+    almoco:Number(e.almoco)||0,he:Number(e.he)||0,faltas:Number(e.faltas)||0,plano:Number(e.plano)||0,
+    inss:Number(e.inss)||0,econ:Number(e.econ)||0,valPagamento:Number(e.valPagamento)||0,obs:e.obs||''
+  });
+  state.fechamentos[fkey]={
+    ano:parseInt($('#salAno').value,10), mes:parseInt($('#salMes').value,10), tipo,
+    data:(tipo==='adiantamento'?$('#salDataAdiant').value:$('#salDataPagto').value), ts:Date.now(), itens
+  };
+  if(tipo==='adiantamento'){ state.employees.forEach(e=>{e.valAdiantamento=0;e.adiantBase=0;}); }
+  else { state.employees.forEach(e=>{e.valPagamento=0;e.base=0;e.descRM=0;e.acresc=0;e.banheiro=0;e.almoco=0;e.he=0;e.faltas=0;e.plano=0;e.inss=0;e.econ=0;}); }
+  persist(); renderSal();
+  toast((tipo==='adiantamento'?'Adiantamento':'Pagamento')+' de '+rotulo+' fechado ✓','ok');
+}
+function atualizarSalFechStatus(){
+  const key=salMesKey(), s=$('#salFechStatus'); if(!s) return;
+  if(!key){ s.textContent=''; return; }
+  const ad=state.fechamentos[key+'-adiantamento'], pg=state.fechamentos[key+'-pagamento'];
+  s.textContent=(ad?'✓ Adiantamento fechado':'○ Adiantamento aberto')+' · '+(pg?'✓ Pagamento fechado':'○ Pagamento aberto');
+}
+function abrirFechamentos(){
+  const key=salMesKey();
+  const rotulo=key?(MESES[parseInt($('#salMes').value,10)]+'/'+$('#salAno').value):'—';
+  $('#fechTitle').textContent='Fechamentos de '+rotulo;
+  const ad=state.fechamentos[key+'-adiantamento'], pg=state.fechamentos[key+'-pagamento'];
+  const adInfo=$('#fechAdiantInfo'), adBody=$('#fechAdiantBody');
+  if(ad){
+    adInfo.innerHTML='Fechado em <b>'+new Date(ad.ts).toLocaleString('pt-BR')+'</b>'+(ad.data?' · data do recibo: '+dataExt(ad.data):'');
+    adBody.innerHTML=ad.itens.map(it=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td><td class="r mono">R$ '+fmtBRL(it.salario)+'</td><td class="r val">R$ '+fmtBRL(it.valAdiantamento)+'</td></tr>').join('');
+  } else { adInfo.textContent='Nenhum fechamento de adiantamento para essa competência.'; adBody.innerHTML=''; }
+  const pgInfo=$('#fechPagtoInfo'), pgBody=$('#fechPagtoBody');
+  if(pg){
+    pgInfo.innerHTML='Fechado em <b>'+new Date(pg.ts).toLocaleString('pt-BR')+'</b>'+(pg.data?' · data do recibo: '+dataExt(pg.data):'');
+    pgBody.innerHTML=pg.itens.map(it=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td><td class="r mono">R$ '+fmtBRL(it.base)+'</td><td class="r mono">R$ '+fmtBRL(it.almoco)+'</td><td class="r val">R$ '+fmtBRL(it.valPagamento)+'</td></tr>').join('');
+  } else { pgInfo.textContent='Nenhum fechamento de pagamento para essa competência.'; pgBody.innerHTML=''; }
+  $('#fechModal').classList.add('open');
+}
+$('#btnFecharAdiant').onclick=()=>fecharCompetencia('adiantamento');
+$('#btnFecharPagto').onclick=()=>fecharCompetencia('pagamento');
+$('#btnVerFechamentos').onclick=abrirFechamentos;
+
 let almImportPend=[];
 async function importarAlmocos(){
   if(!useFirebase){ alert('Sincronização com a nuvem está desativada neste sistema.'); return; }
