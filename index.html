@@ -250,6 +250,19 @@ table.list td.c,table.list th.c{text-align:center}
   .folha{width:100%;min-height:auto;padding:12mm}.recibo{height:auto;min-height:120mm}
 }
 
+/* TELA ESTREITA (celular) — as 11 abas (Funcionários, Lançamento,
+   Salários...) quebravam em várias linhas de botões, empurrando o
+   conteúdo pra baixo. Agora viram uma faixa rolável horizontalmente,
+   como abas de app nativo, em vez de uma grade de botões. */
+@media (max-width:720px){
+  .viewtabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    padding:0 14px;scrollbar-width:none}
+  .viewtabs::-webkit-scrollbar{display:none}
+  .vtab{flex:0 0 auto;padding:12px 12px;font-size:12.5px;white-space:nowrap}
+  .appbar .in{padding:9px 14px;gap:8px}
+  .appbar .brand{font-size:13px}
+}
+
 @media print{
   @page{size:A4;margin:0}
   body{background:#fff}
