@@ -263,6 +263,30 @@ table.list td.c,table.list th.c{text-align:center}
   .appbar .brand{font-size:13px}
 }
 
+/* Tela de Funcionários no celular: a tabela de 6 colunas (#, Funcionário,
+   CPF/CNPJ, Salário, Situação, Ações) não cabe numa tela estreita sem
+   rolagem lateral infinita. Vira uma lista de cartões — um por
+   funcionário — com rótulo antes de cada valor, igual um app de verdade,
+   em vez de imitar uma planilha espremida. Só afeta .emp-list (a tabela
+   de Funcionários), as outras abas continuam como tabela por enquanto. */
+@media (max-width:720px){
+  .emp-list thead{display:none}
+  .emp-list,.emp-list tbody,.emp-list td{display:block;width:100%}
+  .emp-list tr{display:block;background:#fff;border:1px solid var(--line);border-radius:14px;
+    margin:12px 14px;padding:14px 16px;box-shadow:0 1px 2px rgba(20,22,30,.04)}
+  .emp-list tr.row-off{opacity:.75}
+  .emp-list td{border:0;padding:5px 0;text-align:left !important}
+  .emp-list td.idx{display:none}
+  .emp-list td.forn{font-size:15.5px;font-weight:700;padding-top:0}
+  .emp-list td.forn .sub{font-weight:500;font-size:11.5px;margin-top:2px}
+  .emp-list td:not(.forn):not(.idx)::before{content:attr(data-label);display:block;
+    font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+    font-weight:700;margin-bottom:2px}
+  .emp-list td.r{text-align:left !important}
+  .emp-list .rowact{justify-content:flex-start;gap:8px;margin-top:2px}
+  .emp-list .ia{width:40px;height:40px;font-size:16px;border:1px solid var(--line);border-radius:9px}
+}
+
 @media print{
   @page{size:A4;margin:0}
   body{background:#fff}
@@ -351,7 +375,7 @@ table.list td.c,table.list th.c{text-align:center}
         <button class="btn-act save" id="btnAdd" style="align-self:flex-end">＋ Novo funcionário</button>
       </div>
       <div class="tbl-wrap">
-        <table class="list">
+        <table class="list emp-list">
           <thead><tr><th style="width:34px">#</th><th>Funcionário</th><th>CPF / CNPJ</th><th class="r" style="width:130px">Salário fixo</th><th>Situação</th><th class="r">Ações</th></tr></thead>
           <tbody id="empBody"></tbody>
         </table>
@@ -1086,10 +1110,10 @@ function renderEmps(){
     const doc=e.doc?'<span class="mono">'+esc(e.docTipo)+' '+esc(e.doc)+'</span>':'<span class="sub miss">sem CPF</span>';
     const dl=[e.funcao||'',e.banco||'',e.dtInicio?('Adm. '+fmtDate(e.dtInicio)):'',e.dtCarteira?('Carteira '+fmtDate(e.dtCarteira)):''].filter(Boolean).join(' · ');
     const tr=el('tr');
-    tr.innerHTML='<td class="idx">'+i+'</td><td class="forn">'+esc(titlePt(e.nome))+(dl?'<div class="sub">'+dl+'</div>':'')+'</td><td>'+doc+'</td>'+
-      '<td class="r mono">'+(e.salario>0?'R$ '+fmtBRL(e.salario):'<span class="sub">—</span>')+'</td>'+
-      '<td><span class="badge '+badgeStatus(e.status)+'</span></td>'+
-      '<td class="r"><div class="rowact"><button class="ia" data-eh="'+e.id+'" title="Histórico de salário">📊</button><button class="ia" data-ed="'+e.id+'" title="Editar">✎</button><button class="ia del" data-de="'+e.id+'" title="Excluir">✕</button></div></td>';
+    tr.innerHTML='<td class="idx" data-label="#">'+i+'</td><td class="forn" data-label="Funcionário">'+esc(titlePt(e.nome))+(dl?'<div class="sub">'+dl+'</div>':'')+'</td><td data-label="CPF / CNPJ">'+doc+'</td>'+
+      '<td class="r mono" data-label="Salário fixo">'+(e.salario>0?'R$ '+fmtBRL(e.salario):'<span class="sub">—</span>')+'</td>'+
+      '<td data-label="Situação"><span class="badge '+badgeStatus(e.status)+'</span></td>'+
+      '<td class="r" data-label="Ações"><div class="rowact"><button class="ia" data-eh="'+e.id+'" title="Histórico de salário">📊</button><button class="ia" data-ed="'+e.id+'" title="Editar">✎</button><button class="ia del" data-de="'+e.id+'" title="Excluir">✕</button></div></td>';
     b.appendChild(tr);
   });
   b.querySelectorAll('[data-ed]').forEach(x=>x.onclick=()=>openEmp(x.dataset.ed));
@@ -1098,9 +1122,9 @@ function renderEmps(){
   const ob=$('#empOcultos');if(ob){
     const ocultosL=sortByNome(state.employees.filter(e=>isOculto(e)));
     if(!ocultosL.length){ob.innerHTML='';ob.style.display='none';}
-    else{ob.style.display='block';let ht='<div class="section-lab" style="padding:14px 30px 0"><span style="color:var(--muted)">Funcionários desligados / demissão ('+ocultosL.length+')</span><span class="ln"></span></div><div class="tbl-wrap"><table class="list"><tbody>';
+    else{ob.style.display='block';let ht='<div class="section-lab" style="padding:14px 30px 0"><span style="color:var(--muted)">Funcionários desligados / demissão ('+ocultosL.length+')</span><span class="ln"></span></div><div class="tbl-wrap"><table class="list emp-list"><tbody>';
     ocultosL.forEach((e,idx)=>{const doc=e.doc?'<span class="mono">'+esc(e.docTipo)+' '+esc(e.doc)+'</span>':'<span class="sub miss">sem CPF</span>';
-      ht+='<tr class="row-off"><td class="idx">'+(idx+1)+'</td><td class="forn">'+esc(titlePt(e.nome))+'</td><td>'+doc+'</td><td class="r mono">'+(e.salario>0?'R$ '+fmtBRL(e.salario):'\u2014')+'</td><td><span class="badge '+badgeStatus(e.status)+'</span></td><td class="r"><div class="rowact"><button class="ia" data-reactv="'+e.id+'" title="Reativar">\u21a9</button><button class="ia" data-ed="'+e.id+'" title="Editar">\u270e</button></div></td></tr>';});
+      ht+='<tr class="row-off"><td class="idx" data-label="#">'+(idx+1)+'</td><td class="forn" data-label="Funcionário">'+esc(titlePt(e.nome))+'</td><td data-label="CPF / CNPJ">'+doc+'</td><td class="r mono" data-label="Salário fixo">'+(e.salario>0?'R$ '+fmtBRL(e.salario):'\u2014')+'</td><td data-label="Situação"><span class="badge '+badgeStatus(e.status)+'</span></td><td class="r" data-label="Ações"><div class="rowact"><button class="ia" data-reactv="'+e.id+'" title="Reativar">\u21a9</button><button class="ia" data-ed="'+e.id+'" title="Editar">\u270e</button></div></td></tr>';});
     ht+='</tbody></table></div>';ob.innerHTML=ht;
     ob.querySelectorAll('[data-reactv]').forEach(x=>x.onclick=()=>{const emp=state.employees.find(y=>y.id===x.dataset.reactv);if(emp){emp.status='ativo';persist();renderEmps();toast(titlePt(emp.nome)+' reativado','ok');}});
     ob.querySelectorAll('[data-ed]').forEach(x=>x.onclick=()=>openEmp(x.dataset.ed));
