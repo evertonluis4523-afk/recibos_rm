@@ -849,6 +849,9 @@ table.list td.c,table.list th.c{text-align:center}
   <div class="mbody">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div class="section-lab" style="margin:0;flex:1">Adiantamento <span class="ln"></span></div>
+      <button class="btn-act dim" id="fechAdiantEdit" style="padding:6px 11px;font-size:11.5px">✏️ Editar</button>
+      <button class="btn-act save" id="fechAdiantSave" style="padding:6px 11px;font-size:11.5px;display:none">💾 Salvar correções</button>
+      <button class="btn-act dim" id="fechAdiantCancel" style="padding:6px 11px;font-size:11.5px;display:none">✕ Cancelar</button>
       <button class="btn-act dim" id="fechAdiantPdf" style="padding:6px 11px;font-size:11.5px">📄 PDF</button>
       <button class="btn-act dim" id="fechAdiantXlsx" style="padding:6px 11px;font-size:11.5px">📊 Excel</button>
     </div>
@@ -856,11 +859,15 @@ table.list td.c,table.list th.c{text-align:center}
     <div class="tbl-wrap" style="max-height:26vh;overflow:auto;margin-bottom:18px"><table class="list" style="font-size:12px"><thead><tr><th>Funcionário</th><th class="c">Método</th><th class="r">Salário</th><th class="r">Adiantamento</th></tr></thead><tbody id="fechAdiantBody"></tbody></table></div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div class="section-lab" style="margin:0;flex:1">Pagamento <span class="ln"></span></div>
+      <button class="btn-act dim" id="fechPagtoEdit" style="padding:6px 11px;font-size:11.5px">✏️ Editar</button>
+      <button class="btn-act save" id="fechPagtoSave" style="padding:6px 11px;font-size:11.5px;display:none">💾 Salvar correções</button>
+      <button class="btn-act dim" id="fechPagtoCancel" style="padding:6px 11px;font-size:11.5px;display:none">✕ Cancelar</button>
       <button class="btn-act dim" id="fechPagtoPdf" style="padding:6px 11px;font-size:11.5px">📄 PDF</button>
       <button class="btn-act dim" id="fechPagtoXlsx" style="padding:6px 11px;font-size:11.5px">📊 Excel</button>
     </div>
     <div id="fechPagtoInfo" style="font-size:12.5px;color:var(--muted);margin:8px 0 14px"></div>
     <div class="tbl-wrap" style="max-height:26vh;overflow:auto"><table class="list" style="font-size:12px"><thead><tr><th>Funcionário</th><th class="c">Método</th><th class="r">Base líq.</th><th class="r">Almoços</th><th class="r">Pagamento</th></tr></thead><tbody id="fechPagtoBody"></tbody></table></div>
+    <p style="font-size:11px;color:var(--muted);margin-top:6px">Ao editar, os campos são corrigidos direto (sem recálculo automático entre eles) — confira o total depois de mudar Base ou Almoços.</p>
   </div>
   <div class="mfoot"><button class="btn-act dim" data-close>Fechar</button></div>
 </div></div>
@@ -1489,23 +1496,65 @@ function atualizarSalFechStatus(){
   const ad=state.fechamentos[key+'-adiantamento'], pg=state.fechamentos[key+'-pagamento'];
   s.textContent=(ad?'✓ Adiantamento fechado':'○ Adiantamento aberto')+' · '+(pg?'✓ Pagamento fechado':'○ Pagamento aberto');
 }
+let fechEditMode={adiantamento:false,pagamento:false};
 function abrirFechamentos(){
-  const key=salMesKey();
-  const rotulo=key?(MESES[parseInt($('#salMes').value,10)]+'/'+$('#salAno').value):'—';
+  fechEditMode={adiantamento:false,pagamento:false};
+  const rotulo=salMesKey()?(MESES[parseInt($('#salMes').value,10)]+'/'+$('#salAno').value):'—';
   $('#fechTitle').textContent='Fechamentos de '+rotulo;
-  const ad=state.fechamentos[key+'-adiantamento'], pg=state.fechamentos[key+'-pagamento'];
-  const adInfo=$('#fechAdiantInfo'), adBody=$('#fechAdiantBody');
-  if(ad){
-    adInfo.innerHTML='Fechado em <b>'+new Date(ad.ts).toLocaleString('pt-BR')+'</b>'+(ad.data?' · data do recibo: '+dataExt(ad.data):'');
-    adBody.innerHTML=ad.itens.map(it=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td><td class="r mono">R$ '+fmtBRL(it.salario)+'</td><td class="r val">R$ '+fmtBRL(it.valAdiantamento)+'</td></tr>').join('');
-  } else { adInfo.textContent='Nenhum fechamento de adiantamento para essa competência.'; adBody.innerHTML=''; }
-  const pgInfo=$('#fechPagtoInfo'), pgBody=$('#fechPagtoBody');
-  if(pg){
-    pgInfo.innerHTML='Fechado em <b>'+new Date(pg.ts).toLocaleString('pt-BR')+'</b>'+(pg.data?' · data do recibo: '+dataExt(pg.data):'');
-    pgBody.innerHTML=pg.itens.map(it=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td><td class="r mono">R$ '+fmtBRL(it.base)+'</td><td class="r mono">R$ '+fmtBRL(it.almoco)+'</td><td class="r val">R$ '+fmtBRL(it.valPagamento)+'</td></tr>').join('');
-  } else { pgInfo.textContent='Nenhum fechamento de pagamento para essa competência.'; pgBody.innerHTML=''; }
+  renderFechSection('adiantamento');
+  renderFechSection('pagamento');
   $('#fechModal').classList.add('open');
 }
+function renderFechSection(tipo){
+  const isAd=tipo==='adiantamento';
+  const key=salMesKey();
+  const r=state.fechamentos[key+'-'+tipo];
+  const info=$(isAd?'#fechAdiantInfo':'#fechPagtoInfo');
+  const body=$(isAd?'#fechAdiantBody':'#fechPagtoBody');
+  const editBtn=$(isAd?'#fechAdiantEdit':'#fechPagtoEdit');
+  const saveBtn=$(isAd?'#fechAdiantSave':'#fechPagtoSave');
+  const cancelBtn=$(isAd?'#fechAdiantCancel':'#fechPagtoCancel');
+  if(!r){
+    info.textContent='Nenhum fechamento de '+(isAd?'adiantamento':'pagamento')+' para essa competência.';
+    body.innerHTML='';
+    editBtn.style.display='none'; saveBtn.style.display='none'; cancelBtn.style.display='none';
+    return;
+  }
+  const editing=fechEditMode[tipo];
+  editBtn.style.display=editing?'none':'';
+  saveBtn.style.display=editing?'':'none';
+  cancelBtn.style.display=editing?'':'none';
+  info.innerHTML='Fechado em <b>'+new Date(r.ts).toLocaleString('pt-BR')+'</b>'+(r.data?' · data do recibo: '+dataExt(r.data):'')+(editing?' · <b style="color:var(--red)">editando</b>':'');
+  const inp=(idx,f,v)=>'<input class="vinp" data-fe-idx="'+idx+'" data-fe-f="'+f+'" value="'+fmtBRL(v)+'" inputmode="decimal" style="width:100%">';
+  if(isAd){
+    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
+      +'<td class="r">'+(editing?inp(i,'salario',it.salario):'R$ '+fmtBRL(it.salario))+'</td>'
+      +'<td class="r'+(editing?'':' val')+'">'+(editing?inp(i,'valAdiantamento',it.valAdiantamento):'R$ '+fmtBRL(it.valAdiantamento))+'</td></tr>').join('');
+  } else {
+    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
+      +'<td class="r">'+(editing?inp(i,'base',it.base):'R$ '+fmtBRL(it.base))+'</td>'
+      +'<td class="r">'+(editing?inp(i,'almoco',it.almoco):'R$ '+fmtBRL(it.almoco))+'</td>'
+      +'<td class="r'+(editing?'':' val')+'">'+(editing?inp(i,'valPagamento',it.valPagamento):'R$ '+fmtBRL(it.valPagamento))+'</td></tr>').join('');
+  }
+}
+function salvarFechEdit(tipo){
+  const key=salMesKey(), r=state.fechamentos[key+'-'+tipo];
+  if(!r) return;
+  const body=$(tipo==='adiantamento'?'#fechAdiantBody':'#fechPagtoBody');
+  body.querySelectorAll('input[data-fe-idx]').forEach(input=>{
+    const idx=Number(input.dataset.feIdx), f=input.dataset.feF;
+    if(r.itens[idx]) r.itens[idx][f]=parseValor(input.value);
+  });
+  fechEditMode[tipo]=false;
+  persist(); renderFechSection(tipo);
+  toast('Correções de '+(tipo==='adiantamento'?'adiantamento':'pagamento')+' salvas ✓','ok');
+}
+$('#fechAdiantEdit').onclick=()=>{fechEditMode.adiantamento=true;renderFechSection('adiantamento');};
+$('#fechAdiantCancel').onclick=()=>{fechEditMode.adiantamento=false;renderFechSection('adiantamento');};
+$('#fechAdiantSave').onclick=()=>salvarFechEdit('adiantamento');
+$('#fechPagtoEdit').onclick=()=>{fechEditMode.pagamento=true;renderFechSection('pagamento');};
+$('#fechPagtoCancel').onclick=()=>{fechEditMode.pagamento=false;renderFechSection('pagamento');};
+$('#fechPagtoSave').onclick=()=>salvarFechEdit('pagamento');
 $('#btnFecharAdiant').onclick=()=>fecharCompetencia('adiantamento');
 $('#btnFecharPagto').onclick=()=>fecharCompetencia('pagamento');
 $('#btnVerFechamentos').onclick=abrirFechamentos;
