@@ -405,6 +405,7 @@ table.list td.c,table.list th.c{text-align:center}
         <button class="btn-act dim" id="btnSalAuto" style="align-self:flex-end" title="Usa a % para todos; para quem foi admitido no mês, calcula salário/30 × dias até o dia 15">Adiant. = % do salário</button>
         <button class="btn-act dim" id="btnSalResto" style="align-self:flex-end">Pagto = salário − adiant.</button>
         <button class="btn-act dim" id="btnSalDet" style="align-self:flex-end">Detalhar pagamento</button>
+        <button class="btn-act dim" id="btnImportAlmocos" style="align-self:flex-end" title="Puxa o total de almoço do mês (competência) direto do sistema de Almoços">🍽️ Importar Almoços</button>
         <button class="btn-act save" id="btnImportXlsx" style="align-self:flex-end">⭳ Importar Excel</button>
         <input type="file" id="xlsxFile" accept=".xlsx,.xls" style="display:none">
       </div>
@@ -823,6 +824,17 @@ table.list td.c,table.list th.c{text-align:center}
     <div class="tbl-wrap" style="max-height:30vh;overflow:auto"><table class="list" style="font-size:12px"><thead><tr><th>Data</th><th class="r">Horas</th><th>Descrição</th><th>Obs</th><th class="r">Ações</th></tr></thead><tbody id="bhdRecups"></tbody></table></div>
   </div>
   <div class="mfoot"><button class="btn-act dim" data-close>Fechar</button></div>
+</div></div>
+
+<!-- MODAL IMPORTAR ALMOÇOS -->
+<div class="overlay" id="almImportModal"><div class="modal" style="max-width:640px">
+  <div class="mhead"><h2>Importar almoços do sistema de Almoços</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody">
+    <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px">Pareado por nome. Confira antes de aplicar — desmarque quem não deve mudar.</p>
+    <div id="almImportList"></div>
+    <p id="almImportUnmatched" style="color:var(--muted);font-size:12px;margin-top:10px"></p>
+  </div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Cancelar</button><button class="btn-act save" id="almImportApply">Aplicar selecionados</button></div>
 </div></div>
 
 <!-- PRINT -->
@@ -1398,6 +1410,59 @@ $('#btnSalAuto').onclick=()=>{const pct=parseValor($('#salPct').value)||0;if(pct
   });
   persist();renderSal();toast('Adiantamento preenchido'+(prop?' \u00b7 '+prop+' proporcional(is)':''),'ok');};
 $('#btnSalResto').onclick=()=>{empAtivos().forEach(e=>{const s=Number(e.salario)||0,a=Number(e.valAdiantamento)||0;if(s>0){e.base=Math.max(0,Math.round((s-a)*100)/100);e.descRM=0;e.acresc=0;e.banheiro=0;e.almoco=0;}});persist();renderSal();toast('Pagamento = salário − adiantamento','ok');};
+
+/* ---------- Importar Almoços (do sistema de Almoços) ---------- */
+function normName(s){
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+}
+function salMesKey(){
+  const m=parseInt($('#salMes').value,10), y=$('#salAno').value;
+  if(isNaN(m)||!y) return '';
+  return y+'-'+String(m+1).padStart(2,'0');
+}
+let almImportPend=[];
+async function importarAlmocos(){
+  if(!useFirebase){ alert('Sincronização com a nuvem está desativada neste sistema.'); return; }
+  const key=salMesKey();
+  if(!key){ alert('Escolha o mês e o ano da competência primeiro.'); return; }
+  const rotulo=MESES[parseInt($('#salMes').value,10)]+'/'+$('#salAno').value;
+  toast('Buscando almoços de '+rotulo+'…');
+  let snap;
+  try{ snap=await firebase.database().ref('almocos_totais/'+key).once('value'); }
+  catch(e){ alert('Não consegui acessar os totais de almoço: '+((e&&e.message)||e)); return; }
+  const remoto=snap.val();
+  if(!remoto){ alert('Nada encontrado no sistema de Almoços para '+rotulo+'.'); return; }
+  const porNome={};
+  Object.values(remoto).forEach(r=>{ const k=normName(r.nome); if(k) porNome[k]=r; });
+  almImportPend=[];
+  state.employees.forEach(e=>{
+    const r=porNome[normName(e.nome)];
+    if(!r) return; // sem correspondência ou sem almoço nesse mês — não é um "erro", só não tem o que trazer
+    const novo=Math.round((Number(r.valor)||0)*100)/100;
+    const atual=Number(e.almoco)||0;
+    if(novo!==atual) almImportPend.push({e,novo,atual});
+  });
+  if(!almImportPend.length){ toast('Já está tudo sincronizado para '+rotulo+'.'); return; }
+  const list=$('#almImportList');
+  list.innerHTML=almImportPend.map((p,i)=>
+    '<label style="display:flex;gap:9px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px">'+
+    '<input type="checkbox" checked data-idx="'+i+'" style="margin-top:3px">'+
+    '<span><b>'+esc(titlePt(p.e.nome))+'</b><br><span style="color:var(--muted)">Almoços: R$ '+fmtBRL(p.atual)+' → R$ '+fmtBRL(p.novo)+'</span></span></label>'
+  ).join('');
+  $('#almImportModal').classList.add('open');
+}
+$('#btnImportAlmocos').onclick=importarAlmocos;
+$('#almImportApply').onclick=()=>{
+  const idxs=new Set([...$('#almImportList').querySelectorAll('input:checked')].map(c=>Number(c.dataset.idx)));
+  let n=0;
+  almImportPend.forEach((p,i)=>{
+    if(!idxs.has(i)) return;
+    p.e.almoco=p.novo; p.e.valPagamento=calcPag(p.e); n++;
+  });
+  almImportPend=[];
+  persist(); closeAll(); renderSal();
+  toast(n+' funcionário(s) atualizado(s)','ok');
+};
 $('#btnSalDet').onclick=()=>{salDetail=!salDetail;$('#btnSalDet').classList.toggle('save',salDetail);$('#btnSalDet').textContent=salDetail?'Ocultar detalhe':'Detalhar pagamento';renderSal();};
 $('#chkDetRec').onchange=()=>{state.cfg.detalharRecibo=$('#chkDetRec').checked;persist();toast(state.cfg.detalharRecibo?'Recibos sairão detalhados':'Recibos sairão simples','ok');};
 
@@ -1933,7 +1998,19 @@ $('#btnRestore').onclick=()=>$('#fileImport').click();
 $('#fileImport').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{try{const d=JSON.parse(r.result);const emps=Array.isArray(d.employees)?d.employees:mapToEmps(d.employees);if(!emps.length)throw 0;state.cfg={...DEFAULT_CFG,...(d.cfg||{})};state.employees=emps.map((e,i)=>({ord:i,...e}));state.employees.forEach(e=>{if(!e.emprestimos)e.emprestimos=[];if(!e.historicoSalario)e.historicoSalario=[];});const tt=Array.isArray(d.terceiros)?d.terceiros:mapToTerc(d.terceiros);state.terceiros=(tt||[]).map((t,i)=>({ord:i,...t}));state.historico=d.historico||{};state.assiduidade=d.assiduidade||{};state.bancoHoras=d.bancoHoras||{};state.clientes=d.clientes?(Array.isArray(d.clientes)?d.clientes:mapToCli(d.clientes)):[];persist();loadCfg();renderEmps();renderTerc();toast('Backup restaurado','ok');}catch(e){toast('Arquivo inválido','err');}};
   r.readAsText(f);ev.target.value='';};
-$('#btnReset').onclick=()=>{if(!confirm('Apagar TODOS os funcionários e configurações?'))return;if(!confirm('Tem certeza? Não dá pra desfazer.'))return;try{localStorage.removeItem(KEY)}catch(e){mem=null}location.reload();};
+$('#btnReset').onclick=()=>{
+  if(!confirm('Apagar TODOS os funcionários e configurações?'))return;
+  if(!confirm('Tem certeza? Não dá pra desfazer.'))return;
+  // Antes só limpava o localStorage — com o Firebase ativo (nosso caso), os
+  // dados voltavam sozinhos na hora do reload, porque o app sempre busca da
+  // nuvem quando ela está ligada. Precisa apagar lá também.
+  if(useFirebase){
+    fb.db.ref(DB_NODE).remove().catch(()=>{});
+    fb.db.ref('recibos_diretorio').remove().catch(()=>{});
+  }
+  try{localStorage.removeItem(KEY)}catch(e){mem=null}
+  location.reload();
+};
 
 function closeAll(){document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open'));}
 document.querySelectorAll('[data-close]').forEach(x=>x.onclick=closeAll);
