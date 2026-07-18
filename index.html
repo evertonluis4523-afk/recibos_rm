@@ -920,8 +920,20 @@ function startData(){
   }
 }
 function persist(){
-  if(useFirebase){ fb.db.ref(DB_NODE).set({employees:empsToMap(),terceiros:tercToMap(),clientes:cliToMap(),historico:state.historico,assiduidade:state.assiduidade,bancoHoras:state.bancoHoras,cfg:state.cfg}).catch(e=>toast('Erro ao salvar: '+e.message,'err')); }
+  if(useFirebase){
+    fb.db.ref(DB_NODE).set({employees:empsToMap(),terceiros:tercToMap(),clientes:cliToMap(),historico:state.historico,assiduidade:state.assiduidade,bancoHoras:state.bancoHoras,cfg:state.cfg}).catch(e=>toast('Erro ao salvar: '+e.message,'err'));
+    publishDiretorio();
+  }
   else { store.save({employees:state.employees,terceiros:state.terceiros,clientes:state.clientes,historico:state.historico,assiduidade:state.assiduidade,bancoHoras:state.bancoHoras,cfg:state.cfg}); }
+}
+// Publica só nome/função/data de início (nada de salário, banco ou documento)
+// num nó separado, de leitura aberta, pra outros sistemas internos (ex:
+// almo-os) lerem sem precisar do login do recibos. Ver regra sugerida no
+// Firebase: "recibos_diretorio": { ".read": true, ".write": "auth != null" }.
+function publishDiretorio(){
+  const dir={};
+  state.employees.forEach(e=>{ if(!e.id) return; dir[e.id]={nome:e.nome||'',funcao:e.funcao||'',dtInicio:e.dtInicio||''}; });
+  fb.db.ref('recibos_diretorio').set(dir).catch(()=>{});
 }
 
 /* ---------- AUTH (login por e-mail/senha) ---------- */
