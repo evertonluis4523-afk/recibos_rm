@@ -1074,6 +1074,15 @@ function decimalToHM(dec){dec=roundHoras(dec);const neg=dec<0;dec=Math.abs(dec);
 function fmtHM(dec){const r=decimalToHM(dec);let s=(r.neg?'-':'')+r.h+'h';if(r.m>0)s+=String(r.m).padStart(2,'0')+'min';return s;}
 function titlePt(n){return n.toLowerCase().split(/\s+/).map((w,i)=>i>0&&CONN.includes(w)?w:w.charAt(0).toUpperCase()+w.slice(1)).join(' ');}
 function fmtDate(iso){if(!iso)return '';const p=String(iso).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:iso;}
+// Fechamentos feitos antes de a data de admissão passar a ser arquivada não
+// têm esse valor salvo no item; nesse caso busca no cadastro atual do
+// funcionário (por id) em vez de mostrar em branco.
+function admissaoDe(it){
+  if(it.dtInicio) return it.dtInicio;
+  const e=state.employees.find(x=>x.id===it.id);
+  return (e&&e.dtInicio)||'';
+}
+function admissaoFmt(it){ const d=admissaoDe(it); return d?fmtDate(d):'—'; }
 function dataExt(iso){if(!iso)return '';const[y,m,d]=iso.split('-').map(Number);return String(d).padStart(2,'0')+' de '+MESES[m-1]+' de '+y;}
 function toast(m,k){const t=$('#toast');t.textContent=m;t.className='on'+(k?' '+k:'');clearTimeout(t._t);t._t=setTimeout(()=>t.className='',2200);}
 
@@ -1568,11 +1577,11 @@ function renderFechSection(tipo){
   info.innerHTML='Fechado em <b>'+new Date(r.ts).toLocaleString('pt-BR')+'</b>'+(r.data?' · data do recibo: '+dataExt(r.data):'')+(editing?' · <b style="color:var(--red)">editando</b>':'');
   const inp=(idx,f,v)=>'<input class="vinp" data-fe-idx="'+idx+'" data-fe-f="'+f+'" value="'+fmtBRL(v)+'" inputmode="decimal" style="width:100%">';
   if(isAd){
-    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.dtInicio?fmtDate(it.dtInicio):'—')+'</span></td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
+    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(admissaoFmt(it))+'</span></td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
       +'<td class="r">'+(editing?inp(i,'salario',it.salario):'R$ '+fmtBRL(it.salario))+'</td>'
       +'<td class="r'+(editing?'':' val')+'">'+(editing?inp(i,'valAdiantamento',it.valAdiantamento):'R$ '+fmtBRL(it.valAdiantamento))+'</td></tr>').join('');
   } else {
-    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.dtInicio?fmtDate(it.dtInicio):'—')+'</span></td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
+    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(admissaoFmt(it))+'</span></td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
       +'<td class="r">'+(editing?inp(i,'base',it.base):'R$ '+fmtBRL(it.base))+'</td>'
       +'<td class="r">'+(editing?inp(i,'almoco',it.almoco):'R$ '+fmtBRL(it.almoco))+'</td>'
       +'<td class="r'+(editing?'':' val')+'">'+(editing?inp(i,'valPagamento',it.valPagamento):'R$ '+fmtBRL(it.valPagamento))+'</td></tr>').join('');
@@ -1639,8 +1648,8 @@ function exportFechamentoPDF(tipo){
     +'.foot{margin-top:22px;text-align:center;font-size:10px;color:#9aa1aa;border-top:1px solid #dadee3;padding-top:10px}';
 
   const cols=isAd
-    ? [['Nome',it=>esc(titlePt(it.nome))],['Admissão',it=>it.dtInicio?fmtDate(it.dtInicio):'—'],['Método',it=>it.metodo==='pf'?'PF':'Banco'],['Salário fixo',it=>'R$ '+fmtBRL(it.salario),'money'],['Adiantamento',it=>'R$ '+fmtBRL(it.valAdiantamento),'money']]
-    : [['Nome',it=>esc(titlePt(it.nome))],['Admissão',it=>it.dtInicio?fmtDate(it.dtInicio):'—'],['Método',it=>it.metodo==='pf'?'PF':'Banco'],['Base líq.',it=>'R$ '+fmtBRL(it.base),'money'],['Desc. RM',it=>'R$ '+fmtBRL(it.descRM),'money'],['Banheiro',it=>'R$ '+fmtBRL(it.banheiro),'money'],['Acréscimos',it=>'R$ '+fmtBRL(it.acresc),'money'],['Almoços',it=>'R$ '+fmtBRL(it.almoco),'money'],['Pagamento',it=>'R$ '+fmtBRL(it.valPagamento),'money']];
+    ? [['Nome',it=>esc(titlePt(it.nome))],['Admissão',it=>admissaoFmt(it)],['Método',it=>it.metodo==='pf'?'PF':'Banco'],['Salário fixo',it=>'R$ '+fmtBRL(it.salario),'money'],['Adiantamento',it=>'R$ '+fmtBRL(it.valAdiantamento),'money']]
+    : [['Nome',it=>esc(titlePt(it.nome))],['Admissão',it=>admissaoFmt(it)],['Método',it=>it.metodo==='pf'?'PF':'Banco'],['Base líq.',it=>'R$ '+fmtBRL(it.base),'money'],['Desc. RM',it=>'R$ '+fmtBRL(it.descRM),'money'],['Banheiro',it=>'R$ '+fmtBRL(it.banheiro),'money'],['Acréscimos',it=>'R$ '+fmtBRL(it.acresc),'money'],['Almoços',it=>'R$ '+fmtBRL(it.almoco),'money'],['Pagamento',it=>'R$ '+fmtBRL(it.valPagamento),'money']];
   const valorDe=it=>Number(isAd?it.valAdiantamento:it.valPagamento)||0;
   const tabela=itens=>{
     let t='<table><thead><tr>'+cols.map(c=>'<th'+(c[2]==='money'?' class="money"':'')+'>'+c[0]+'</th>').join('')+'</tr></thead><tbody>';
@@ -1706,7 +1715,7 @@ function exportFechamentoXLSX(tipo){
       const row=ws.getRow(ri++);
       const valTot=Number(isAd?it.valAdiantamento:it.valPagamento)||0;
       tot+=valTot;
-      const adm=it.dtInicio?fmtDate(it.dtInicio):'—';
+      const adm=admissaoFmt(it);
       const vals=isAd
         ? [i+1,it.nome,adm,it.metodo==='pf'?'PF':'Banco',it.salario,valTot]
         : [i+1,it.nome,adm,it.metodo==='pf'?'PF':'Banco',it.base,it.descRM,it.banheiro,it.acresc,it.almoco,valTot];
