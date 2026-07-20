@@ -897,7 +897,7 @@ table.list td.c,table.list th.c{text-align:center}
       <button class="btn-act dim" id="fechAdiantXlsx" style="padding:6px 11px;font-size:11.5px">📊 Excel</button>
     </div>
     <div id="fechAdiantInfo" style="font-size:12.5px;color:var(--muted);margin:8px 0 14px"></div>
-    <div class="tbl-wrap" style="max-height:26vh;overflow:auto;margin-bottom:18px"><table class="list" style="font-size:12px"><thead><tr><th>Funcionário</th><th class="c">Método</th><th class="r">Salário</th><th class="r">Adiantamento</th></tr></thead><tbody id="fechAdiantBody"></tbody></table></div>
+    <div class="tbl-wrap" style="max-height:26vh;overflow:auto;margin-bottom:18px"><table class="list" style="font-size:12px"><thead><tr><th>Funcionário</th><th class="c">Admissão</th><th class="c">Método</th><th class="r">Salário</th><th class="r">Adiantamento</th></tr></thead><tbody id="fechAdiantBody"></tbody></table></div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div class="section-lab" style="margin:0;flex:1">Pagamento <span class="ln"></span></div>
       <button class="btn-act dim" id="fechPagtoEdit" style="padding:6px 11px;font-size:11.5px">✏️ Editar</button>
@@ -907,7 +907,7 @@ table.list td.c,table.list th.c{text-align:center}
       <button class="btn-act dim" id="fechPagtoXlsx" style="padding:6px 11px;font-size:11.5px">📊 Excel</button>
     </div>
     <div id="fechPagtoInfo" style="font-size:12.5px;color:var(--muted);margin:8px 0 14px"></div>
-    <div class="tbl-wrap" style="max-height:26vh;overflow:auto"><table class="list" style="font-size:12px"><thead><tr><th>Funcionário</th><th class="c">Método</th><th class="r">Base líq.</th><th class="r">Almoços</th><th class="r">Pagamento</th></tr></thead><tbody id="fechPagtoBody"></tbody></table></div>
+    <div class="tbl-wrap" style="max-height:26vh;overflow:auto"><table class="list" style="font-size:12px"><thead><tr><th>Funcionário</th><th class="c">Admissão</th><th class="c">Método</th><th class="r">Base líq.</th><th class="r">Almoços</th><th class="r">Pagamento</th></tr></thead><tbody id="fechPagtoBody"></tbody></table></div>
     <p style="font-size:11px;color:var(--muted);margin-top:6px">Ao editar, os campos são corrigidos direto (sem recálculo automático entre eles) — confira o total depois de mudar Base ou Almoços.</p>
   </div>
   <div class="mfoot"><button class="btn-act dim" data-close>Fechar</button></div>
@@ -1513,11 +1513,11 @@ function fecharCompetencia(tipo){
   if(state.fechamentos[fkey] && !confirm('Já existe um fechamento de '+label+' para '+rotulo+'. Fechar de novo substitui o arquivo anterior. Continuar?')) return;
   if(!confirm('Fechar o '+label+' de '+rotulo+'?\n\nIsso arquiva os valores atuais de todos os funcionários e limpa os campos pra você começar o próximo mês do zero.')) return;
   const itens=state.employees.map(e=>tipo==='adiantamento'?{
-    id:e.id,nome:e.nome,metodo:e.metodo||'banco',salario:Number(e.salario)||0,
+    id:e.id,nome:e.nome,dtInicio:e.dtInicio||'',metodo:e.metodo||'banco',salario:Number(e.salario)||0,
     adiantBase:Number(e.adiantBase)||0,adicional:Number(e.adicional)||0,desconto:Number(e.desconto)||0,
     valAdiantamento:Number(e.valAdiantamento)||0
   }:{
-    id:e.id,nome:e.nome,metodo:e.metodo||'banco',salario:Number(e.salario)||0,
+    id:e.id,nome:e.nome,dtInicio:e.dtInicio||'',metodo:e.metodo||'banco',salario:Number(e.salario)||0,
     base:Number(e.base)||0,descRM:Number(e.descRM)||0,banheiro:Number(e.banheiro)||0,acresc:Number(e.acresc)||0,
     almoco:Number(e.almoco)||0,he:Number(e.he)||0,faltas:Number(e.faltas)||0,plano:Number(e.plano)||0,
     inss:Number(e.inss)||0,econ:Number(e.econ)||0,valPagamento:Number(e.valPagamento)||0,obs:e.obs||''
@@ -1568,11 +1568,11 @@ function renderFechSection(tipo){
   info.innerHTML='Fechado em <b>'+new Date(r.ts).toLocaleString('pt-BR')+'</b>'+(r.data?' · data do recibo: '+dataExt(r.data):'')+(editing?' · <b style="color:var(--red)">editando</b>':'');
   const inp=(idx,f,v)=>'<input class="vinp" data-fe-idx="'+idx+'" data-fe-f="'+f+'" value="'+fmtBRL(v)+'" inputmode="decimal" style="width:100%">';
   if(isAd){
-    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
+    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.dtInicio?fmtDate(it.dtInicio):'—')+'</span></td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
       +'<td class="r">'+(editing?inp(i,'salario',it.salario):'R$ '+fmtBRL(it.salario))+'</td>'
       +'<td class="r'+(editing?'':' val')+'">'+(editing?inp(i,'valAdiantamento',it.valAdiantamento):'R$ '+fmtBRL(it.valAdiantamento))+'</td></tr>').join('');
   } else {
-    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
+    body.innerHTML=r.itens.map((it,i)=>'<tr><td class="forn">'+esc(titlePt(it.nome))+'</td><td class="c"><span class="sub">'+(it.dtInicio?fmtDate(it.dtInicio):'—')+'</span></td><td class="c"><span class="sub">'+(it.metodo==='pf'?'PF':'Banco')+'</span></td>'
       +'<td class="r">'+(editing?inp(i,'base',it.base):'R$ '+fmtBRL(it.base))+'</td>'
       +'<td class="r">'+(editing?inp(i,'almoco',it.almoco):'R$ '+fmtBRL(it.almoco))+'</td>'
       +'<td class="r'+(editing?'':' val')+'">'+(editing?inp(i,'valPagamento',it.valPagamento):'R$ '+fmtBRL(it.valPagamento))+'</td></tr>').join('');
@@ -1639,8 +1639,8 @@ function exportFechamentoPDF(tipo){
     +'.foot{margin-top:22px;text-align:center;font-size:10px;color:#9aa1aa;border-top:1px solid #dadee3;padding-top:10px}';
 
   const cols=isAd
-    ? [['Nome',it=>esc(titlePt(it.nome))],['Método',it=>it.metodo==='pf'?'PF':'Banco'],['Salário fixo',it=>'R$ '+fmtBRL(it.salario),'money'],['Adiantamento',it=>'R$ '+fmtBRL(it.valAdiantamento),'money']]
-    : [['Nome',it=>esc(titlePt(it.nome))],['Método',it=>it.metodo==='pf'?'PF':'Banco'],['Base líq.',it=>'R$ '+fmtBRL(it.base),'money'],['Desc. RM',it=>'R$ '+fmtBRL(it.descRM),'money'],['Banheiro',it=>'R$ '+fmtBRL(it.banheiro),'money'],['Acréscimos',it=>'R$ '+fmtBRL(it.acresc),'money'],['Almoços',it=>'R$ '+fmtBRL(it.almoco),'money'],['Pagamento',it=>'R$ '+fmtBRL(it.valPagamento),'money']];
+    ? [['Nome',it=>esc(titlePt(it.nome))],['Admissão',it=>it.dtInicio?fmtDate(it.dtInicio):'—'],['Método',it=>it.metodo==='pf'?'PF':'Banco'],['Salário fixo',it=>'R$ '+fmtBRL(it.salario),'money'],['Adiantamento',it=>'R$ '+fmtBRL(it.valAdiantamento),'money']]
+    : [['Nome',it=>esc(titlePt(it.nome))],['Admissão',it=>it.dtInicio?fmtDate(it.dtInicio):'—'],['Método',it=>it.metodo==='pf'?'PF':'Banco'],['Base líq.',it=>'R$ '+fmtBRL(it.base),'money'],['Desc. RM',it=>'R$ '+fmtBRL(it.descRM),'money'],['Banheiro',it=>'R$ '+fmtBRL(it.banheiro),'money'],['Acréscimos',it=>'R$ '+fmtBRL(it.acresc),'money'],['Almoços',it=>'R$ '+fmtBRL(it.almoco),'money'],['Pagamento',it=>'R$ '+fmtBRL(it.valPagamento),'money']];
   const valorDe=it=>Number(isAd?it.valAdiantamento:it.valPagamento)||0;
   const tabela=itens=>{
     let t='<table><thead><tr>'+cols.map(c=>'<th'+(c[2]==='money'?' class="money"':'')+'>'+c[0]+'</th>').join('')+'</tr></thead><tbody>';
@@ -1682,8 +1682,8 @@ function exportFechamentoXLSX(tipo){
    try{
     const isAd=tipo==='adiantamento';
     const mesNome=MESES[r.mes].charAt(0).toUpperCase()+MESES[r.mes].slice(1);
-    const head=isAd?['#','Funcionário','Método','Salário fixo','Adiantamento']:['#','Funcionário','Método','Base líq.','Desc. RM','Banheiro','Acréscimos','Almoços','Pagamento'];
-    const Wd=isAd?[5,32,10,16,16]:[5,32,10,14,12,12,12,12,14];
+    const head=isAd?['#','Funcionário','Admissão','Método','Salário fixo','Adiantamento']:['#','Funcionário','Admissão','Método','Base líq.','Desc. RM','Banheiro','Acréscimos','Almoços','Pagamento'];
+    const Wd=isAd?[5,32,12,10,16,16]:[5,32,12,10,14,12,12,12,12,14];
     const wb=new ExcelJS.Workbook();
     const ws=wb.addWorksheet((isAd?'Adiantamento':'Pagamento')+' '+mesNome+' '+r.ano,{views:[{state:'frozen',ySplit:4}]});
     Wd.forEach((w,i)=>ws.getColumn(i+1).width=w);
@@ -1706,10 +1706,11 @@ function exportFechamentoXLSX(tipo){
       const row=ws.getRow(ri++);
       const valTot=Number(isAd?it.valAdiantamento:it.valPagamento)||0;
       tot+=valTot;
+      const adm=it.dtInicio?fmtDate(it.dtInicio):'—';
       const vals=isAd
-        ? [i+1,it.nome,it.metodo==='pf'?'PF':'Banco',it.salario,valTot]
-        : [i+1,it.nome,it.metodo==='pf'?'PF':'Banco',it.base,it.descRM,it.banheiro,it.acresc,it.almoco,valTot];
-      vals.forEach((v,ci)=>{const c=row.getCell(ci+1);c.value=v;c.border=border;c.alignment={horizontal:ci===1?'left':'center',vertical:'middle'};if(ci>=3)c.numFmt='"R$" #,##0.00';});
+        ? [i+1,it.nome,adm,it.metodo==='pf'?'PF':'Banco',it.salario,valTot]
+        : [i+1,it.nome,adm,it.metodo==='pf'?'PF':'Banco',it.base,it.descRM,it.banheiro,it.acresc,it.almoco,valTot];
+      vals.forEach((v,ci)=>{const c=row.getCell(ci+1);c.value=v;c.border=border;c.alignment={horizontal:ci===1?'left':'center',vertical:'middle'};if(ci>=4)c.numFmt='"R$" #,##0.00';});
     });
     const tr=ws.getRow(ri);
     ws.mergeCells(ri,1,ri,head.length-1); tr.getCell(1).value='TOTAL'; tr.getCell(1).alignment={horizontal:'right',vertical:'middle'};
