@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>RM Estruturas — Controle de Recibos</title>
+<title>RM Estruturas — Folha de Pagamento</title>
 <meta name="theme-color" content="#1d2127">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Recibos RM">
+<meta name="apple-mobile-web-app-title" content="Folha RM">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -306,7 +306,7 @@ table.list td.c,table.list th.c{text-align:center}
 <body>
 
 <div class="appbar"><div class="in">
-  <div class="brand"><span class="dot"></span><b>RM</b> · Controle de Recibos</div>
+  <div class="brand"><span class="dot"></span><b>RM</b> · Folha de Pagamento</div>
   <div class="spacer"></div>
   <span class="syncpill" id="syncPill"><span class="led"></span><span id="syncTxt">local</span></span>
   <span class="who hide-sm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aeb4bd" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><b id="whoLabel">—</b></span>
@@ -320,7 +320,7 @@ table.list td.c,table.list th.c{text-align:center}
   <div class="login-card">
     <div class="lc-head">
       <img id="loginLogo" alt="RM Estruturas">
-      <div class="ttl">Controle de Recibos</div>
+      <div class="ttl">Folha de Pagamento</div>
       <div class="sub">Acesso restrito · RM Estruturas</div>
     </div>
     <div class="lc-body">
@@ -344,7 +344,7 @@ table.list td.c,table.list th.c{text-align:center}
         <div class="mut">CNPJ 28.654.965/0001-17 · 51 99789-7879</div>
         <div>Rod RSC 453, KM 42 nº 6151, Pavilhão 2, Sala 2</div>
         <div>Novo Paraíso · Estrela/RS · 95883-000</div>
-        <div class="doc-tag">Controle de Recibos</div>
+        <div class="doc-tag">Folha de Pagamento</div>
       </div>
     </div>
 
@@ -1675,7 +1675,7 @@ function exportFechamentoPDF(tipo){
   html+='<div class="sec">Em espécie — PF — '+tbP.qtd+'</div>'+tbP.html
     +'<table><tr class="sub"><td>Subtotal PF (espécie)</td><td class="money">R$ '+fmtBRL(tbP.sub)+'</td></tr></table>';
   html+='<table style="margin-top:10px"><tr class="grand"><td>TOTAL GERAL ('+(tbB.qtd+tbP.qtd)+')</td><td class="money">R$ '+fmtBRL(tbB.sub+tbP.sub)+'</td></tr></table>';
-  html+='<div class="foot">RM Estruturas Pré-Fabricadas · Controle de Recibos</div></div>';
+  html+='<div class="foot">RM Estruturas Pré-Fabricadas · Folha de Pagamento</div></div>';
 
   const wrap=document.createElement('div');
   wrap.innerHTML='<style>'+css+'</style>'+html;
@@ -2248,7 +2248,7 @@ function exportRelPDF(key){
       +'<table><tr class="sub"><td>Subtotal PF (esp\u00e9cie)</td><td class="money">R$ '+fmtBRL(tbP.sub)+'</td></tr></table>';
     html+='<table style="margin-top:10px"><tr class="grand"><td>TOTAL GERAL ('+(tbB.qtd+tbP.qtd)+')</td><td class="money">R$ '+fmtBRL(tbB.sub+tbP.sub)+'</td></tr></table>';
   }
-  html+='<div class="foot">RM Estruturas Pr\u00e9-Fabricadas \u00b7 Controle de Recibos</div></div>';
+  html+='<div class="foot">RM Estruturas Pr\u00e9-Fabricadas \u00b7 Folha de Pagamento</div></div>';
 
   const wrap=document.createElement('div');
   wrap.innerHTML='<style>'+css+'</style>'+html;
