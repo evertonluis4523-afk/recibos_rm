@@ -41,7 +41,7 @@ input,textarea,select{font-family:inherit;color:inherit}
 .appbar .in{max-width:1600px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:9px 18px;flex-wrap:wrap}
 .appbar .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;font-size:13px}
 .appbar .brand b{color:var(--red);font-weight:800}
-.appbar .dot{width:7px;height:7px;background:var(--red);transform:rotate(45deg)}
+.appbar .rm-logo{height:26px;width:auto;display:block}
 .appbar .spacer{flex:1}
 .appbar .who{font-size:11px;letter-spacing:.04em;color:var(--muted);display:flex;align-items:center;gap:7px}
 .appbar .who .g{width:7px;height:7px;border-radius:50%;background:var(--ok)}
@@ -306,7 +306,7 @@ table.list td.c,table.list th.c{text-align:center}
 <body>
 
 <div class="appbar"><div class="in">
-  <div class="brand"><span class="dot"></span><b>RM</b> · Folha de Pagamento</div>
+  <div class="brand"><img id="appbarLogo" class="rm-logo" alt="RM Estruturas"><b>RM</b> · Folha de Pagamento</div>
   <div class="spacer"></div>
   <span class="syncpill" id="syncPill"><span class="led"></span><span id="syncTxt">local</span></span>
   <span class="who hide-sm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aeb4bd" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><b id="whoLabel">—</b></span>
@@ -1086,7 +1086,7 @@ function admissaoFmt(it){ const d=admissaoDe(it); return d?fmtDate(d):'—'; }
 function dataExt(iso){if(!iso)return '';const[y,m,d]=iso.split('-').map(Number);return String(d).padStart(2,'0')+' de '+MESES[m-1]+' de '+y;}
 function toast(m,k){const t=$('#toast');t.textContent=m;t.className='on'+(k?' '+k:'');clearTimeout(t._t);t._t=setTimeout(()=>t.className='',2200);}
 
-$('#logoImg').src=LOGO; $('#loginLogo').src=LOGO;
+$('#logoImg').src=LOGO; $('#loginLogo').src=LOGO; $('#appbarLogo').src=LOGO;
 
 document.querySelectorAll('.vtab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.vtab').forEach(x=>x.classList.remove('on'));
