@@ -77,6 +77,15 @@ input,textarea,select{font-family:inherit;color:inherit}
 .card .s{font-size:11px;color:var(--muted);margin-top:3px}
 .card.afa .v{color:var(--warn)} .card.sem .v{color:var(--red)} .card.atv .v{color:var(--ok)}
 .dotk{width:8px;height:8px;border-radius:50%}
+.rel-chart{display:flex;align-items:flex-end;gap:6px;height:140px;padding:16px 20px 6px;border-bottom:1px solid var(--line)}
+.rel-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.rel-bar{width:100%;max-width:28px;background:var(--brand,var(--red));border-radius:4px 4px 0 0;min-height:2px;transition:height .2s}
+.rel-bar-lab{font-size:9.5px;color:var(--muted);margin-top:6px;text-transform:uppercase;font-weight:700}
+.rel-pessoa-card{padding:12px 20px;border-bottom:1px solid var(--line-2)}
+.rel-pessoa-card .nm{font-weight:700;margin-bottom:6px}
+.rel-pessoa-meses{display:flex;flex-wrap:wrap;gap:6px;font-size:11px}
+.rel-pessoa-meses span{background:var(--line-2,#f1f1f1);border-radius:6px;padding:3px 8px;color:var(--muted)}
+.rel-pessoa-meses span b{color:var(--text,#111);font-family:var(--mono)}
 .dotk.w{background:var(--warn)} .dotk.r{background:var(--red)} .dotk.g{background:var(--ok)} .dotk.b{background:var(--ink)}
 
 /* Add/form zone */
@@ -620,6 +629,11 @@ table.list td.c,table.list th.c{text-align:center}
         <div class="section-lab">Relatório de valores pagos <span class="ln"></span></div>
         <div class="form-grid">
           <div class="f span3"><span class="lab">Ano</span><select id="relAno"></select></div>
+          <div class="f span5"><span class="lab">Buscar funcionário ou terceiro</span><input id="relBusca" list="relNomesList" placeholder="digite um nome"></div>
+          <datalist id="relNomesList"></datalist>
+          <div class="f span4" style="align-self:flex-end">
+            <button class="btn-act dim" id="btnRelCSV" style="width:100%">⬇ Exportar ano (CSV)</button>
+          </div>
         </div>
       </div>
       <div class="cards" style="grid-template-columns:repeat(4,1fr)">
@@ -628,6 +642,17 @@ table.list td.c,table.list th.c{text-align:center}
         <div class="card afa"><div class="k"><span class="dotk w"></span>Em espécie (PF)</div><div class="v" id="relTotPF">R$ 0,00</div></div>
         <div class="card"><div class="k"><span class="dotk r"></span>Terceiros</div><div class="v" id="relTotTerc">R$ 0,00</div></div>
       </div>
+      <div class="sheetfoot" id="relCompAno" style="margin-top:-6px"></div>
+
+      <div id="relBuscaWrap" style="display:none">
+        <div class="section-lab" style="margin-top:18px">Resumo por pessoa <span class="ln"></span></div>
+        <div id="relBuscaResult"></div>
+      </div>
+
+      <div class="section-lab" style="margin-top:18px">Evolução mensal <span class="ln"></span></div>
+      <div class="rel-chart" id="relChart"></div>
+
+      <div class="section-lab" style="margin-top:18px">Lançamentos por mês <span class="ln"></span></div>
       <div class="tbl-wrap">
         <table class="list">
           <thead><tr><th>Mês</th><th>Tipo</th><th class="c">Qtd</th><th class="r">Banco</th><th class="r">Espécie (PF)</th><th class="r">Total</th><th class="r">Ações</th></tr></thead>
@@ -635,6 +660,22 @@ table.list td.c,table.list th.c{text-align:center}
         </table>
       </div>
       <div class="sheetfoot"><span>Os pagamentos são registrados aqui automaticamente quando você gera os recibos.</span></div>
+
+      <div class="section-lab" style="margin-top:18px">Por função <span class="ln"></span></div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th>Função</th><th class="c">Pessoas</th><th class="r">Total no ano</th></tr></thead>
+          <tbody id="relFuncaoBody"></tbody>
+        </table>
+      </div>
+
+      <div class="section-lab" style="margin-top:18px">Reajustes salariais do ano <span class="ln"></span></div>
+      <div class="tbl-wrap">
+        <table class="list">
+          <thead><tr><th>Data</th><th>Funcionário</th><th class="r">Salário anterior</th><th class="r">Salário novo</th><th class="r">Variação</th></tr></thead>
+          <tbody id="relReajBody"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- BANCO DE HORAS -->
@@ -1987,7 +2028,8 @@ function renderRel(){
   list.forEach(r=>{tTot+=r.total;if(r.tipo==='terceiros')tTerc+=r.total;else{tBanco+=r.banco;tPF+=r.pf;}});
   $('#relTotAno').textContent='R$ '+fmtBRL(tTot);$('#relTotBanco').textContent='R$ '+fmtBRL(tBanco);$('#relTotPF').textContent='R$ '+fmtBRL(tPF);$('#relTotTerc').textContent='R$ '+fmtBRL(tTerc);
   const b=$('#relBody');b.innerHTML='';
-  if(!list.length){b.innerHTML='<tr><td colspan="7"><div class="empty"><b>Nenhum pagamento registrado em '+ano+'</b>Gere recibos para começar a alimentar o relatório.</div></td></tr>';return;}
+  if(!list.length){b.innerHTML='<tr><td colspan="7"><div class="empty"><b>Nenhum pagamento registrado em '+ano+'</b>Gere recibos para começar a alimentar o relatório.</div></td></tr>';}
+  else{
   list.forEach(r=>{const mesNome=MESES[r.mes].charAt(0).toUpperCase()+MESES[r.mes].slice(1);const terc=r.tipo==='terceiros';const tr=el('tr');
     tr.innerHTML='<td class="forn">'+mesNome+'</td><td><span class="badge '+(r.tipo==='adiantamento'?'afa':(terc?'':'atv'))+'"><span class="d"></span>'+(TIPO_LAB[r.tipo]||r.tipo)+'</span></td>'+
       '<td class="c mono">'+r.qtd+'</td>'+
@@ -1999,8 +2041,131 @@ function renderRel(){
   b.querySelectorAll('[data-rdet]').forEach(x=>x.onclick=()=>relDetalhes(x.dataset.rdet));
   b.querySelectorAll('[data-rpdf]').forEach(x=>x.onclick=()=>exportRelPDF(x.dataset.rpdf));
   b.querySelectorAll('[data-rdel]').forEach(x=>x.onclick=()=>{const r=state.historico[x.dataset.rdel];if(!confirm('Excluir o registro de '+(TIPO_LAB[r.tipo]||r.tipo)+' de '+MESES[r.mes]+'/'+r.ano+'?'))return;delete state.historico[x.dataset.rdel];persist();renderRel();toast('Registro excluído');});
+  }
+  relChart(ano,list);
+  relComparativo(ano,recs);
+  relFuncaoResumo(list);
+  relReajustes(ano);
+  relNomesList();
+  relBuscaAplicar();
 }
 $('#relAno') && ($('#relAno').onchange=renderRel);
+$('#relBusca') && ($('#relBusca').oninput=relBuscaAplicar);
+
+/* ---- gráfico de evolução mensal ---- */
+function relChart(ano,list){
+  const el_=$('#relChart');if(!el_)return;
+  const totais=new Array(12).fill(0);
+  list.forEach(r=>{totais[r.mes]+=r.total;});
+  const max=Math.max(1,...totais);
+  el_.innerHTML=totais.map((v,i)=>{
+    const h=Math.max(2,Math.round((v/max)*100));
+    const nomeMes=MESES[i].slice(0,3).toUpperCase();
+    return '<div class="rel-bar-col" title="'+MESES[i]+'/'+ano+': R$ '+fmtBRL(v)+'"><div class="rel-bar" style="height:'+h+'%"></div><div class="rel-bar-lab">'+nomeMes+'</div></div>';
+  }).join('');
+}
+/* ---- comparação com o ano anterior ---- */
+function relComparativo(ano,recs){
+  const el_=$('#relCompAno');if(!el_)return;
+  const totAtual=recs.filter(r=>r.ano===ano).reduce((s,r)=>s+r.total,0);
+  const totAnterior=recs.filter(r=>r.ano===ano-1).reduce((s,r)=>s+r.total,0);
+  if(totAnterior<=0){el_.innerHTML='<span>Sem dados de '+(ano-1)+' pra comparar.</span>';return;}
+  const diffPct=((totAtual-totAnterior)/totAnterior)*100;
+  const cor=diffPct>0?'var(--red)':(diffPct<0?'var(--ok)':'var(--muted)');
+  el_.innerHTML='<span>Comparado a '+(ano-1)+' (R$ '+fmtBRL(totAnterior)+'): <b style="color:'+cor+'">'+(diffPct>=0?'+':'')+diffPct.toFixed(1)+'%</b></span>';
+}
+/* ---- resumo por função (usa a função ATUAL de cada funcionário) ---- */
+function relFuncaoResumo(list){
+  const b=$('#relFuncaoBody');if(!b)return;
+  const porNome={};
+  state.employees.forEach(e=>{porNome[e.nome.trim().toLowerCase()]=e.funcao||'— sem função —';});
+  const grupos={};
+  list.forEach(r=>{
+    if(r.tipo==='terceiros'){ (grupos['Terceiros']=grupos['Terceiros']||{tot:0,nomes:new Set()}).tot+=r.total; (r.itens||[]).forEach(it=>grupos['Terceiros'].nomes.add(it.nome)); return; }
+    (r.itens||[]).forEach(it=>{
+      const fn=porNome[(it.nome||'').trim().toLowerCase()]||'— sem função —';
+      const g=grupos[fn]=grupos[fn]||{tot:0,nomes:new Set()};
+      g.tot+=Number(it.valor)||0; g.nomes.add(it.nome);
+    });
+  });
+  const rows=Object.keys(grupos).sort((a,b2)=>grupos[b2].tot-grupos[a].tot);
+  if(!rows.length){b.innerHTML='<tr><td colspan="3"><div class="empty"><b>Sem dados</b></div></td></tr>';return;}
+  b.innerHTML=rows.map(fn=>'<tr><td class="forn">'+esc(fn)+'</td><td class="c mono">'+grupos[fn].nomes.size+'</td><td class="r val">R$ '+fmtBRL(grupos[fn].tot)+'</td></tr>').join('');
+}
+/* ---- reajustes salariais registrados no ano selecionado ---- */
+function relReajustes(ano){
+  const b=$('#relReajBody');if(!b)return;
+  const linhas=[];
+  state.employees.forEach(e=>{
+    (e.historicoSalario||[]).forEach(h=>{
+      if(!h.data||h.data.slice(0,4)!==String(ano))return;
+      linhas.push({data:h.data,nome:e.nome,anterior:h.anterior||0,novo:h.novo||0,pct:h.pct});
+    });
+  });
+  linhas.sort((a,b2)=>b2.data.localeCompare(a.data));
+  if(!linhas.length){b.innerHTML='<tr><td colspan="5"><div class="empty"><b>Nenhum reajuste registrado em '+ano+'</b></div></td></tr>';return;}
+  b.innerHTML=linhas.map(l=>{
+    const pctTxt=(l.pct===null||l.pct===undefined)?'<span class="sub">—</span>':('<span style="color:'+(l.pct>=0?'var(--ok)':'var(--red)')+';font-weight:700">'+(l.pct>=0?'+':'')+l.pct.toFixed(2).replace('.',',')+'%</span>');
+    return '<tr><td class="mono">'+fmtDate(l.data)+'</td><td class="forn">'+esc(titlePt(l.nome))+'</td><td class="r mono">'+(l.anterior>0?'R$ '+fmtBRL(l.anterior):'<span class="sub">—</span>')+'</td><td class="r mono">R$ '+fmtBRL(l.novo)+'</td><td class="r">'+pctTxt+'</td></tr>';
+  }).join('');
+}
+/* ---- busca por funcionário/terceiro: resumo mês a mês no ano ---- */
+function relNomesList(){
+  const dl=$('#relNomesList');if(!dl)return;
+  const nomes=new Set();
+  state.employees.forEach(e=>nomes.add(e.nome));
+  state.terceiros.forEach(t=>nomes.add(t.nome));
+  dl.innerHTML=[...nomes].sort().map(n=>'<option value="'+esc(n)+'">').join('');
+}
+function relBuscaAplicar(){
+  const wrap=$('#relBuscaWrap'),host=$('#relBuscaResult'),inp=$('#relBusca');
+  if(!wrap||!host||!inp)return;
+  const q=inp.value.trim().toLowerCase();
+  if(!q){wrap.style.display='none';host.innerHTML='';return;}
+  const ano=+($('#relAno').value||new Date().getFullYear());
+  const list=relYearRecords(ano);
+  const porPessoa={};
+  list.forEach(r=>{
+    (r.itens||[]).forEach(it=>{
+      if(!(it.nome||'').toLowerCase().includes(q))return;
+      const key=it.nome;
+      const p=porPessoa[key]=porPessoa[key]||{meses:new Array(12).fill(0),tot:0};
+      p.meses[r.mes]+=Number(it.valor)||0; p.tot+=Number(it.valor)||0;
+    });
+  });
+  const nomes=Object.keys(porPessoa).sort();
+  wrap.style.display='block';
+  if(!nomes.length){host.innerHTML='<div class="empty" style="padding:16px 20px"><b>Ninguém encontrado em '+ano+'</b>Confira o nome ou troque o ano.</div>';return;}
+  host.innerHTML=nomes.map(n=>{
+    const p=porPessoa[n];
+    const meses=p.meses.map((v,i)=>v>0?('<span>'+MESES[i].slice(0,3)+' <b>R$ '+fmtBRL(v)+'</b></span>'):'').filter(Boolean).join('');
+    return '<div class="rel-pessoa-card"><div class="nm">'+esc(titlePt(n))+' <span class="sub" style="font-weight:400">· total no ano: R$ '+fmtBRL(p.tot)+'</span></div><div class="rel-pessoa-meses">'+meses+'</div></div>';
+  }).join('');
+}
+function relYearRecords(ano){
+  return Object.keys(state.historico||{}).map(k=>({key:k,...state.historico[k]})).filter(r=>r.ano===ano);
+}
+/* ---- exportar o ano inteiro em CSV ---- */
+function relExportCSV(){
+  const ano=+($('#relAno').value||new Date().getFullYear());
+  const list=relYearRecords(ano);
+  if(!list.length){toast('Nenhum lançamento em '+ano+' pra exportar','err');return;}
+  const cell=x=>{x=String(x==null?'':x);return /[";\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;};
+  const head=['Mês','Tipo','Nome','Documento','Método/Serviço','Salário','Valor'];
+  const linhas=[head.map(cell).join(';')];
+  list.sort((a,b)=>a.mes-b.mes).forEach(r=>{
+    const mesNome=MESES[r.mes].charAt(0).toUpperCase()+MESES[r.mes].slice(1);
+    (r.itens||[]).forEach(it=>{
+      const metodo=r.tipo==='terceiros'?(it.servico||''):(it.metodo==='pf'?'PF':'Banco');
+      const linha=[mesNome,TIPO_LAB[r.tipo]||r.tipo,it.nome,it.doc||'',metodo,it.salario>0?String(it.salario).replace('.',','):'',String(it.valor||0).replace('.',',')];
+      linhas.push(linha.map(cell).join(';'));
+    });
+  });
+  const blob=new Blob(['﻿'+linhas.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=el('a');a.href=URL.createObjectURL(blob);a.download='relatorio_'+ano+'.csv';a.click();URL.revokeObjectURL(a.href);
+  toast('CSV exportado','ok');
+}
+$('#btnRelCSV') && ($('#btnRelCSV').onclick=relExportCSV);
 function relDetalhes(key){const r=state.historico[key];if(!r)return;
   $('#relmTitle').textContent=(TIPO_LAB[r.tipo]||r.tipo)+' · '+MESES[r.mes]+'/'+r.ano;
   const b=$('#relmBody');b.innerHTML='';
