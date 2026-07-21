@@ -1035,7 +1035,31 @@ function seedDefault(){return SEED.map((p,i)=>({id:"e"+i,nome:p[0],docTipo:"CPF"
 function applyData(v){v=v||{};state.cfg={...DEFAULT_CFG,...(v.cfg||{})};state.employees=v.employees?mapToEmps(v.employees):[];state.employees.forEach(e=>{if(!e.emprestimos)e.emprestimos=[];if(!e.historicoSalario)e.historicoSalario=[];});state.terceiros=v.terceiros?mapToTerc(v.terceiros):[];state.historico=v.historico||{};state.assiduidade=v.assiduidade||{};state.bancoHoras=v.bancoHoras||{};state.fechamentos=v.fechamentos||{};state.clientes=v.clientes?mapToCli(v.clientes):[];}
 
 function normCfg(){if(!Array.isArray(state.cfg.funcoes))state.cfg.funcoes=state.cfg.funcoes?Object.values(state.cfg.funcoes):[...DEFAULT_CFG.funcoes];if(!Array.isArray(state.cfg.bancos))state.cfg.bancos=state.cfg.bancos?Object.values(state.cfg.bancos):[...DEFAULT_CFG.bancos];}
-function bootUI(){ normCfg(); loadCfg(); renderEmps(); renderTerc(); if($('#v-lanc').classList.contains('on')) renderLanc(); if($('#v-sal').classList.contains('on')) renderSal(); if($('#v-empr').classList.contains('on')) renderEmpr(); if($('#v-assid').classList.contains('on')) renderAssid(); if($('#v-terclanc').classList.contains('on')) renderTercLanc(); if($('#v-rel').classList.contains('on')) renderRel(); if($('#v-bh').classList.contains('on')) renderBH(); if($('#v-cli').classList.contains('on')) renderCli(); }
+// Recupera competências que foram fechadas (state.fechamentos) mas nunca
+// geradas (state.historico) — acontecia sempre que "Fechar" era clicado sem
+// antes clicar em "Recibos ... →", já que só o segundo alimentava o Relatório.
+// A chave de fechamentos (ano-MM-tipo) é idêntica à de historico, então dá
+// pra cruzar direto.
+function backfillHistoricoDeFechamentos(){
+  let changed=false;
+  Object.keys(state.fechamentos||{}).forEach(fkey=>{
+    if(state.historico[fkey])return;
+    const r=state.fechamentos[fkey];
+    if(!r||(r.tipo!=='adiantamento'&&r.tipo!=='pagamento'))return;
+    const campoVal=r.tipo==='adiantamento'?'valAdiantamento':'valPagamento';
+    const itens=(r.itens||[]).filter(it=>(Number(it[campoVal])||0)>0).map(it=>({
+      nome:it.nome, doc:(state.employees.find(e=>e.id===it.id)||{}).doc||'',
+      valor:Number(it[campoVal])||0, metodo:it.metodo||'banco', salario:Number(it.salario)||0
+    }));
+    if(!itens.length)return;
+    let banco=0,pf=0,total=0;
+    itens.forEach(it=>{total+=it.valor;if(it.metodo==='pf')pf+=it.valor;else banco+=it.valor;});
+    state.historico[fkey]={ano:r.ano,mes:r.mes,tipo:r.tipo,data:r.data||'',total,banco,pf,qtd:itens.length,itens,ts:r.ts||Date.now()};
+    changed=true;
+  });
+  if(changed)persist();
+}
+function bootUI(){ backfillHistoricoDeFechamentos(); normCfg(); loadCfg(); renderEmps(); renderTerc(); if($('#v-lanc').classList.contains('on')) renderLanc(); if($('#v-sal').classList.contains('on')) renderSal(); if($('#v-empr').classList.contains('on')) renderEmpr(); if($('#v-assid').classList.contains('on')) renderAssid(); if($('#v-terclanc').classList.contains('on')) renderTercLanc(); if($('#v-rel').classList.contains('on')) renderRel(); if($('#v-bh').classList.contains('on')) renderBH(); if($('#v-cli').classList.contains('on')) renderCli(); }
 
 /* ---------- DATA LAYER (Firebase RTDB ou localStorage) ---------- */
 function startData(){
@@ -1630,6 +1654,16 @@ function fecharCompetencia(tipo){
     ano:parseInt($('#salAno').value,10), mes:parseInt($('#salMes').value,10), tipo,
     data:(tipo==='adiantamento'?$('#salDataAdiant').value:$('#salDataPagto').value), ts:Date.now(), itens
   };
+  // Fechar arquiva e zera os campos — sem isso, quem fecha sem antes clicar em
+  // "Recibos ... →" nunca alimenta a aba Relatórios (que só lê state.historico).
+  // Então também registramos aqui, com os mesmos valores que estão sendo arquivados.
+  const campoVal=tipo==='adiantamento'?'valAdiantamento':'valPagamento';
+  const itensHist=itens.filter(it=>(Number(it[campoVal])||0)>0).map(it=>({
+    nome:it.nome, doc:(state.employees.find(e=>e.id===it.id)||{}).doc||'',
+    valor:Number(it[campoVal])||0, metodo:it.metodo||'banco', salario:Number(it.salario)||0
+  }));
+  if(itensHist.length) registrarHistorico(tipo,parseInt($('#salAno').value,10),parseInt($('#salMes').value,10),
+    (tipo==='adiantamento'?$('#salDataAdiant').value:$('#salDataPagto').value), itensHist);
   if(tipo==='adiantamento'){ state.employees.forEach(e=>{e.valAdiantamento=0;e.adiantBase=0;}); }
   else { state.employees.forEach(e=>{e.valPagamento=0;e.base=0;e.descRM=0;e.acresc=0;e.banheiro=0;e.almoco=0;e.he=0;e.faltas=0;e.plano=0;e.inss=0;e.econ=0;}); }
   persist(); renderSal();
