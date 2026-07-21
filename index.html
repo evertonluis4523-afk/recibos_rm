@@ -379,6 +379,7 @@ table.list td.c,table.list th.c{text-align:center}
         </table>
       </div>
       <div id="empOcultos" style="display:none"></div>
+      <div id="empLixeira" style="display:none"></div>
     </div>
 
     <!-- LANÇAMENTO -->
@@ -1059,7 +1060,22 @@ function doLogin(){
   }
 }
 function doLogout(){ if(useFirebase){ fb.auth.signOut(); } else { sessionStorage.removeItem(AUTH_KEY); showLogin(true); } $('#li_pass').value=''; }
-function onAuthed(label){ showLogin(false); $('#whoLabel').textContent=label||'—'; startData(); }
+/* Ações destrutivas (excluir funcionário de vez, zerar tudo, apagar tudo)
+   ficam visíveis só pra conta admin. Organização de interface, não é a
+   camada de segurança real — quem edita ainda tem permissão de escrita
+   no banco (senão nem o resto do trabalho dela funcionaria). */
+const ADMIN_EMAIL='evertonluis4523@gmail.com';
+function isAdminUser(){
+  if(!useFirebase) return true; // modo local (sem contas): não há o que restringir
+  return !!(fb && fb.auth && fb.auth.currentUser && fb.auth.currentUser.email===ADMIN_EMAIL);
+}
+function applyAdminOnlyUI(){
+  const admin=isAdminUser();
+  ['#btnZerarAdiant','#btnZerarPagto','#btnZerarAmbos','#btnReset'].forEach(sel=>{
+    const el=$(sel); if(el) el.style.display=admin?'':'none';
+  });
+}
+function onAuthed(label){ showLogin(false); $('#whoLabel').textContent=label||'—'; applyAdminOnlyUI(); startData(); }
 window.doLogin=doLogin;
 
 function sortByNome(arr){return arr.slice().sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt-BR'));}
@@ -1108,20 +1124,22 @@ document.querySelectorAll('.vtab').forEach(t=>t.onclick=()=>{
 
 /* FUNCIONÁRIOS */
 let editId=null;
-function badgeStatus(s){if(s==='ativo')return 'atv"><span class="d"></span>Ativo';if(s==='afast')return 'afa"><span class="d"></span>Afastado';if(s==='desligado')return '" style="background:#f1f2f4;color:#6c7480"><span class="d"></span>Desligado';return '" style="background:#f1f2f4;color:#6c7480"><span class="d"></span>Demissão';}
+function badgeStatus(s){if(s==='ativo')return 'atv"><span class="d"></span>Ativo';if(s==='afast')return 'afa"><span class="d"></span>Afastado';if(s==='excluido')return '" style="background:#fce4e4;color:#b3261e"><span class="d"></span>Na lixeira';if(s==='desligado')return '" style="background:#f1f2f4;color:#6c7480"><span class="d"></span>Desligado';return '" style="background:#f1f2f4;color:#6c7480"><span class="d"></span>Demissão';}
 function renderEmps(){
-  const visiveis=state.employees.filter(e=>!isOculto(e));
+  const naLixeira=e=>e.status==='excluido';
+  const visiveis=state.employees.filter(e=>!isOculto(e)&&!naLixeira(e));
   $('#cTot').textContent=visiveis.length;
   $('#cAtv').textContent=visiveis.filter(e=>e.status==='ativo').length;
   $('#cAfa').textContent=visiveis.filter(e=>e.status==='afast').length;
   $('#cSem').textContent=visiveis.filter(e=>!e.doc).length;
   const q=($('#fSearch').value||'').toLowerCase(),f=$('#fStatus').value,b=$('#empBody');b.innerHTML='';
+  const admin=isAdminUser();
   const list=sortByNome(visiveis).filter(e=>{
     if(q&&!(e.nome.toLowerCase().includes(q)||(e.doc||'').toLowerCase().includes(q)))return false;
     if(f==='ativo'&&e.status!=='ativo')return false;
     if(f==='afast'&&e.status!=='afast')return false;return true;});
-  if(!list.length){b.innerHTML='<tr><td colspan="6"><div class="empty"><b>Nenhum funcionário</b>Ajuste a busca ou adicione um novo.</div></td></tr>';return;}
-  list.forEach(e=>{
+  if(!list.length){b.innerHTML='<tr><td colspan="6"><div class="empty"><b>Nenhum funcionário</b>Ajuste a busca ou adicione um novo.</div></td></tr>';}
+  else list.forEach(e=>{
     const i=state.employees.indexOf(e)+1;
     const doc=e.doc?'<span class="mono">'+esc(e.docTipo)+' '+esc(e.doc)+'</span>':'<span class="sub miss">sem CPF</span>';
     const dl=[e.funcao||'',e.banco||'',e.dtInicio?('Adm. '+fmtDate(e.dtInicio)):'',e.dtCarteira?('Carteira '+fmtDate(e.dtCarteira)):''].filter(Boolean).join(' · ');
@@ -1129,7 +1147,7 @@ function renderEmps(){
     tr.innerHTML='<td class="idx" data-label="#">'+i+'</td><td class="forn" data-label="Funcionário">'+esc(titlePt(e.nome))+(dl?'<div class="sub">'+dl+'</div>':'')+'</td><td data-label="CPF / CNPJ">'+doc+'</td>'+
       '<td class="r mono" data-label="Salário fixo">'+(e.salario>0?'R$ '+fmtBRL(e.salario):'<span class="sub">—</span>')+'</td>'+
       '<td data-label="Situação"><span class="badge '+badgeStatus(e.status)+'</span></td>'+
-      '<td class="r" data-label="Ações"><div class="rowact"><button class="ia" data-eh="'+e.id+'" title="Histórico de salário">📊</button><button class="ia" data-ed="'+e.id+'" title="Editar">✎</button><button class="ia del" data-de="'+e.id+'" title="Excluir">✕</button></div></td>';
+      '<td class="r" data-label="Ações"><div class="rowact"><button class="ia" data-eh="'+e.id+'" title="Histórico de salário">📊</button><button class="ia" data-ed="'+e.id+'" title="Editar">✎</button>'+(admin?'<button class="ia del" data-de="'+e.id+'" title="Mover para a lixeira">✕</button>':'')+'</div></td>';
     b.appendChild(tr);
   });
   b.querySelectorAll('[data-ed]').forEach(x=>x.onclick=()=>openEmp(x.dataset.ed));
@@ -1144,6 +1162,16 @@ function renderEmps(){
     ht+='</tbody></table></div>';ob.innerHTML=ht;
     ob.querySelectorAll('[data-reactv]').forEach(x=>x.onclick=()=>{const emp=state.employees.find(y=>y.id===x.dataset.reactv);if(emp){emp.status='ativo';persist();renderEmps();toast(titlePt(emp.nome)+' reativado','ok');}});
     ob.querySelectorAll('[data-ed]').forEach(x=>x.onclick=()=>openEmp(x.dataset.ed));
+    }}
+  const lx=$('#empLixeira');if(lx){
+    const lixeiraL=sortByNome(state.employees.filter(naLixeira));
+    if(!lixeiraL.length){lx.innerHTML='';lx.style.display='none';}
+    else{lx.style.display='block';let ht='<div class="section-lab" style="padding:14px 30px 0"><span style="color:var(--muted)">Lixeira — '+lixeiraL.length+' funcionário(s) excluído(s)</span><span class="ln"></span></div><div class="tbl-wrap"><table class="list emp-list"><tbody>';
+    lixeiraL.forEach((e,idx)=>{const doc=e.doc?'<span class="mono">'+esc(e.docTipo)+' '+esc(e.doc)+'</span>':'<span class="sub miss">sem CPF</span>';
+      ht+='<tr class="row-off"><td class="idx" data-label="#">'+(idx+1)+'</td><td class="forn" data-label="Funcionário">'+esc(titlePt(e.nome))+(e.excluidoEm?'<div class="sub">excluído em '+fmtDate(e.excluidoEm.slice(0,10))+'</div>':'')+'</td><td data-label="CPF / CNPJ">'+doc+'</td><td class="r mono" data-label="Salário fixo">'+(e.salario>0?'R$ '+fmtBRL(e.salario):'—')+'</td><td data-label="Situação"><span class="badge '+badgeStatus(e.status)+'</span></td><td class="r" data-label="Ações"><div class="rowact"><button class="ia" data-restaurar="'+e.id+'" title="Restaurar">↩</button>'+(admin?'<button class="ia del" data-delforever="'+e.id+'" title="Excluir definitivamente">✕</button>':'')+'</div></td></tr>';});
+    ht+='</tbody></table></div>';lx.innerHTML=ht;
+    lx.querySelectorAll('[data-restaurar]').forEach(x=>x.onclick=()=>restaurarEmp(x.dataset.restaurar));
+    lx.querySelectorAll('[data-delforever]').forEach(x=>x.onclick=()=>delEmpForever(x.dataset.delforever));
     }}
 }
 let histSalCurId=null;
@@ -1190,13 +1218,24 @@ function adicionarHistSalarioManual(){
   persist();openHistSal(empId);renderEmps();toast('Registro adicionado ao histórico','ok');
 }
 $('#histAddBtn').onclick=adicionarHistSalarioManual;
+// Protege contra erro de digitação: se o salário mudar mais de 20%, pede uma
+// confirmação explícita mostrando de/para antes de salvar. Mudança pequena
+// ou a primeira vez que o salário é definido não interrompe (sem atrito).
+function confirmarMudancaSalario(anterior,novo){
+  if(anterior<=0||novo<=0)return true;
+  const diffPct=Math.abs((novo-anterior)/anterior)*100;
+  if(diffPct<20)return true;
+  return confirm('O salário vai mudar de R$ '+fmtBRL(anterior)+' para R$ '+fmtBRL(novo)+' ('+(novo>anterior?'+':'-')+diffPct.toFixed(0)+'%).\n\nConfirma essa alteração?');
+}
 function registrarHistoricoSalario(e,novo){
   const anterior=Number(e.salario)||0;novo=Number(novo)||0;
+  if(anterior===novo)return true;
+  if(!confirmarMudancaSalario(anterior,novo))return false;
   if(!e.historicoSalario)e.historicoSalario=[];
-  if(anterior===novo)return;
   let pct=null;if(anterior>0)pct=((novo-anterior)/anterior)*100;
   e.historicoSalario.unshift({data:new Date().toISOString().slice(0,10),anterior:anterior,novo:novo,pct:pct});
   e.salario=novo;
+  return true;
 }
 function openEmp(id){editId=id||null;const e=id?state.employees.find(x=>x.id===id):null;
   $('#mTitle').textContent=e?'Editar funcionário':'Novo funcionário';
@@ -1205,11 +1244,21 @@ function openEmp(id){editId=id||null;const e=id?state.employees.find(x=>x.id===i
 function saveEmp(){const nome=$('#mNome').value.trim();if(!nome){toast('Informe o nome','err');return;}
   const d={nome,docTipo:$('#mDocTipo').value,doc:$('#mDoc').value.trim(),status:$('#mStatus').value,funcao:$('#mFuncao').value,banco:$('#mBanco').value,dtInicio:$('#mDtInicio').value,dtCarteira:$('#mDtCarteira').value};
   const novoSalario=parseValor($('#mSalario').value);
-  if(editId){const emp=state.employees.find(x=>x.id===editId);Object.assign(emp,d);registrarHistoricoSalario(emp,novoSalario);}
+  if(editId){const emp=state.employees.find(x=>x.id===editId);if(!registrarHistoricoSalario(emp,novoSalario))return;Object.assign(emp,d);}
   else{const emp={id:"e"+Date.now(),...d,salario:0,metodo:"banco",obs:"",base:0,descRM:0,acresc:0,banheiro:0,almoco:0,he:0,faltas:0,plano:0,inss:0,econ:0,valPagamento:0,valAdiantamento:0,historicoSalario:[],ord:state.employees.length};registrarHistoricoSalario(emp,novoSalario);state.employees.push(emp);}
   persist();closeAll();renderEmps();toast('Funcionário salvo','ok');}
-function delEmp(id){const e=state.employees.find(x=>x.id===id);if(!confirm('Excluir '+titlePt(e.nome)+'?'))return;
-  state.employees=state.employees.filter(x=>x.id!==id);delete state.gen.excluded[id];persist();renderEmps();toast('Excluído');}
+// "Excluir" move pra lixeira (reversível) em vez de apagar de vez — protege
+// contra clique acidental, principalmente de quem não é a conta admin.
+function delEmp(id){const e=state.employees.find(x=>x.id===id);if(!e)return;
+  if(!confirm('Mover '+titlePt(e.nome)+' para a lixeira?\n\nFica lá até alguém restaurar ou excluir de vez.'))return;
+  e.status='excluido';e.excluidoEm=new Date().toISOString();persist();renderEmps();toast(titlePt(e.nome)+' movido para a lixeira','ok');}
+function restaurarEmp(id){const e=state.employees.find(x=>x.id===id);if(!e)return;
+  e.status='ativo';delete e.excluidoEm;persist();renderEmps();toast(titlePt(e.nome)+' restaurado','ok');}
+function delEmpForever(id){const e=state.employees.find(x=>x.id===id);if(!e)return;
+  const digitado=prompt('Isso apaga '+titlePt(e.nome)+' e todo o histórico dele(a) para sempre — não dá pra desfazer.\n\nDigite o nome "'+e.nome+'" pra confirmar:');
+  if(digitado===null)return;
+  if(digitado.trim().toLowerCase()!==e.nome.trim().toLowerCase()){toast('Nome não confere — nada foi excluído','err');return;}
+  state.employees=state.employees.filter(x=>x.id!==id);delete state.gen.excluded[id];persist();renderEmps();toast('Excluído definitivamente');}
 $('#btnAdd').onclick=()=>openEmp(null);$('#mSave').onclick=saveEmp;
 $('#fSearch').oninput=renderEmps;$('#fStatus').onchange=renderEmps;
 $('#btnImport').onclick=()=>$('#impModal').classList.add('open');
@@ -1459,7 +1508,9 @@ function renderSal(){
       '<td class="r det"><span class="cur">R$</span><input class="vinp" data-sbase="'+e.id+'" value="'+(e.base>0?fmtBRL(e.base):'')+'" placeholder="base" inputmode="decimal"></td>'+'<td class="r det"><span class="cur">R$</span><input class="vinp" data-sdrm="'+e.id+'" value="'+(e.descRM>0?fmtBRL(e.descRM):'')+'" placeholder="desc. RM" inputmode="decimal"></td>'+'<td class="r det"><span class="cur">R$</span><input class="vinp" data-sbanh="'+e.id+'" value="'+(e.banheiro>0?fmtBRL(e.banheiro):'')+'" placeholder="banheiro" inputmode="decimal"></td>'+'<td class="r det"><span class="cur">R$</span><input class="vinp" data-sacr="'+e.id+'" value="'+(e.acresc>0?fmtBRL(e.acresc):'')+'" placeholder="acréscimos" inputmode="decimal"></td>'+'<td class="r det"><span class="cur">R$</span><input class="vinp" data-salm="'+e.id+'" value="'+(e.almoco>0?fmtBRL(e.almoco):'')+'" placeholder="almoços" inputmode="decimal"></td>'+(salDetail?'<td class="r val" data-spgv="'+e.id+'">R$ '+fmtBRL(e.valPagamento)+'</td>':'<td class="r"><span class="cur">R$</span><input class="vinp" data-spg="'+e.id+'" value="'+(e.base>0?fmtBRL(e.base):'')+'" placeholder="0,00" inputmode="decimal"></td>')+'<td><textarea class="obsinp" data-sobs="'+e.id+'" rows="1" placeholder="observação...">'+esc(e.obs||'')+'</textarea></td>';
     b.appendChild(tr);});
   b.querySelectorAll('[data-smet]').forEach(s=>s.onchange=()=>{const e=state.employees.find(x=>x.id===s.dataset.smet);e.metodo=s.value;persist();renderSal();});
-  b.querySelectorAll('[data-ssal]').forEach(inp=>inp.onchange=()=>{const e=state.employees.find(x=>x.id===inp.dataset.ssal),v=parseValor(inp.value);registrarHistoricoSalario(e,v);persist();renderSal();});
+  b.querySelectorAll('[data-ssal]').forEach(inp=>inp.onchange=()=>{const e=state.employees.find(x=>x.id===inp.dataset.ssal),v=parseValor(inp.value),anterior=Number(e.salario)||0;
+    if(!registrarHistoricoSalario(e,v)){inp.value=anterior>0?fmtBRL(anterior):'';return;}
+    persist();renderSal();});
   b.querySelectorAll('[data-sadic]').forEach(inp=>inp.onchange=()=>{const e=state.employees.find(x=>x.id===inp.dataset.sadic),v=parseValor(inp.value);e.adicional=v;persist();renderSal();});
   b.querySelectorAll('[data-sdesc]').forEach(inp=>inp.onchange=()=>{const e=state.employees.find(x=>x.id===inp.dataset.sdesc),v=parseValor(inp.value);e.desconto=v;persist();renderSal();});
   b.querySelectorAll('[data-sad]').forEach(inp=>inp.onchange=()=>{const e=state.employees.find(x=>x.id===inp.dataset.sad),v=parseValor(inp.value);e.adiantBase=v;persist();renderSal();});
