@@ -138,6 +138,8 @@ table.list td.c,table.list th.c{text-align:center}
 .badge.atv{background:var(--ok-soft);color:var(--ok)}
 .badge.afa{background:var(--warn-soft);color:var(--warn)}
 .badge .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#f1f2f4;color:#6c7480;margin:2px 4px 2px 0;cursor:pointer;transition:.12s}
+.chip:hover{background:#e4e6ea;color:var(--ink)}
 .chk{width:18px;height:18px;accent-color:var(--red);cursor:pointer}
 .vinp{width:118px;border:1.5px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13.5px;font-weight:700;text-align:right;font-family:var(--mono);background:#fafbfc}
 .vinp:focus{outline:0;border-color:var(--red);background:#fff;box-shadow:0 0 0 3px var(--red-soft)}
@@ -664,10 +666,11 @@ table.list td.c,table.list th.c{text-align:center}
       <div class="section-lab" style="margin-top:18px">Por função <span class="ln"></span></div>
       <div class="tbl-wrap">
         <table class="list">
-          <thead><tr><th>Função</th><th class="c">Pessoas</th><th class="r">Total no ano</th></tr></thead>
+          <thead><tr><th>Função</th><th class="c">Pessoas</th><th class="r">Total no ano</th><th class="r">Ações</th></tr></thead>
           <tbody id="relFuncaoBody"></tbody>
         </table>
       </div>
+      <div id="relFuncaoOcultas" style="margin-top:8px"></div>
 
       <div class="section-lab" style="margin-top:18px">Reajustes salariais do ano <span class="ln"></span></div>
       <div class="tbl-wrap">
@@ -778,6 +781,16 @@ table.list td.c,table.list th.c{text-align:center}
   <div class="mhead"><h2 id="relmTitle">Detalhes</h2><button class="x" data-close>✕</button></div>
   <div class="mbody"><div class="tbl-wrap"><table class="list" style="font-size:12.5px"><thead><tr><th>Nome</th><th class="c">Método</th><th class="r">Salário fixo</th><th class="r">Valor</th></tr></thead><tbody id="relmBody"></tbody></table></div></div>
   <div class="mfoot"><button class="btn-act dim" data-close>Fechar</button></div>
+</div></div>
+
+<!-- MODAL EDITAR FUNÇÃO DE UM GRUPO (relatório "Por função") -->
+<div class="overlay" id="funcaoEditModal"><div class="modal">
+  <div class="mhead"><h2 id="funcaoEditTitle">Editar função</h2><button class="x" data-close>✕</button></div>
+  <div class="mbody">
+    <div class="sub" style="margin-bottom:10px">Escolha a função certa pra quem está sem uma. Quem não aparecer no cadastro atual (nome mudou ou funcionário foi excluído) precisa ser ajustado direto no cadastro.</div>
+    <div class="tbl-wrap"><table class="list" style="font-size:12.5px"><thead><tr><th>Nome</th><th>Função</th></tr></thead><tbody id="funcaoEditBody"></tbody></table></div>
+  </div>
+  <div class="mfoot"><button class="btn-act dim" data-close>Cancelar</button><button class="btn-act save" id="funcaoEditSave">Salvar</button></div>
 </div></div>
 
 <!-- MODAL DETALHES EMPRÉSTIMO -->
@@ -999,7 +1012,7 @@ let fb=null, seeded=false;
 const store={load(){try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null}catch(e){return mem}},save(d){try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){mem=d}}};
 const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 const CONN=["da","de","do","das","dos","e"];
-const DEFAULT_CFG={razao:"Nunes & Kuhn Estruturas Metálicas Ltda",endereco:"Rodovia RSC 453, 6151 Km 42 Bairro Novo Paraíso",cidade:"Estrela/RS",cnpj:"28.654.965/0001-17",cidadeEmissao:"Estrela",detalharRecibo:false,bancos:["Sicredi","Banco do Brasil","Banrisul","Caixa","Nubank","Picpay","Bradesco"],funcoes:["Motorista","Auxiliar de produção","Auxiliar de escritório","Projetista","Operador ponte rolante","Ajustador de forma","Soldador","Montador de Estruturas Pré Moldado","Coordenador Administrativo","Motorista Betoneira","Auxiliar montagem Pré Moldado","Auxiliar montagem Estrutura Metálica","Montador de Estrutura Metálica","Pintor Estrutura","Coordenador de Produção"]};
+const DEFAULT_CFG={razao:"Nunes & Kuhn Estruturas Metálicas Ltda",endereco:"Rodovia RSC 453, 6151 Km 42 Bairro Novo Paraíso",cidade:"Estrela/RS",cnpj:"28.654.965/0001-17",cidadeEmissao:"Estrela",detalharRecibo:false,funcoesOcultasRel:[],bancos:["Sicredi","Banco do Brasil","Banrisul","Caixa","Nubank","Picpay","Bradesco"],funcoes:["Motorista","Auxiliar de produção","Auxiliar de escritório","Projetista","Operador ponte rolante","Ajustador de forma","Soldador","Montador de Estruturas Pré Moldado","Coordenador Administrativo","Motorista Betoneira","Auxiliar montagem Pré Moldado","Auxiliar montagem Estrutura Metálica","Montador de Estrutura Metálica","Pintor Estrutura","Coordenador de Produção"]};
 const SEED=[
 ["ADRIANO ROLOFF","585.407.170-34"],["ALDOMIR DA ROSA","481.641.600-59"],["ANTÔNIO ALVES NETO","006.107.580-98"],
 ["ARLEI LUIS WENTZ","897.792.070-15"],["BIANCA THAÍS OLIVEIRA","037.334.640-95"],["BRUNA EDUARDA STORCK","037.006.100-41"],
@@ -1034,7 +1047,7 @@ function mapToEmps(m){return Object.keys(m||{}).map(id=>Object.assign({id},m[id]
 function seedDefault(){return SEED.map((p,i)=>({id:"e"+i,nome:p[0],docTipo:"CPF",doc:p[1],status:"ativo",funcao:"",banco:"",dtInicio:"",dtCarteira:"",salario:0,metodo:"banco",obs:"",base:0,descRM:0,acresc:0,banheiro:0,almoco:0,he:0,faltas:0,plano:0,inss:0,econ:0,valPagamento:0,valAdiantamento:0,ord:i}));}
 function applyData(v){v=v||{};state.cfg={...DEFAULT_CFG,...(v.cfg||{})};state.employees=v.employees?mapToEmps(v.employees):[];state.employees.forEach(e=>{if(!e.emprestimos)e.emprestimos=[];if(!e.historicoSalario)e.historicoSalario=[];});state.terceiros=v.terceiros?mapToTerc(v.terceiros):[];state.historico=v.historico||{};state.assiduidade=v.assiduidade||{};state.bancoHoras=v.bancoHoras||{};state.fechamentos=v.fechamentos||{};state.clientes=v.clientes?mapToCli(v.clientes):[];}
 
-function normCfg(){if(!Array.isArray(state.cfg.funcoes))state.cfg.funcoes=state.cfg.funcoes?Object.values(state.cfg.funcoes):[...DEFAULT_CFG.funcoes];if(!Array.isArray(state.cfg.bancos))state.cfg.bancos=state.cfg.bancos?Object.values(state.cfg.bancos):[...DEFAULT_CFG.bancos];}
+function normCfg(){if(!Array.isArray(state.cfg.funcoes))state.cfg.funcoes=state.cfg.funcoes?Object.values(state.cfg.funcoes):[...DEFAULT_CFG.funcoes];if(!Array.isArray(state.cfg.bancos))state.cfg.bancos=state.cfg.bancos?Object.values(state.cfg.bancos):[...DEFAULT_CFG.bancos];if(!Array.isArray(state.cfg.funcoesOcultasRel))state.cfg.funcoesOcultasRel=state.cfg.funcoesOcultasRel?Object.values(state.cfg.funcoesOcultasRel):[];}
 // Recupera competências que foram fechadas (state.fechamentos) mas nunca
 // geradas (state.historico) — acontecia sempre que "Fechar" era clicado sem
 // antes clicar em "Recibos ... →", já que só o segundo alimentava o Relatório.
@@ -2108,24 +2121,96 @@ function relComparativo(ano,recs){
   const cor=diffPct>0?'var(--red)':(diffPct<0?'var(--ok)':'var(--muted)');
   el_.innerHTML='<span>Comparado a '+(ano-1)+' (R$ '+fmtBRL(totAnterior)+'): <b style="color:'+cor+'">'+(diffPct>=0?'+':'')+diffPct.toFixed(1)+'%</b></span>';
 }
-/* ---- resumo por função (usa a função ATUAL de cada funcionário) ---- */
+/* ---- resumo por função (usa a função ATUAL de cada funcionário) ----
+   "— sem função —" agrupa quem: (a) está cadastrado mas sem o campo
+   função preenchido, ou (b) tem um nome no recibo que não bate com
+   nenhum funcionário atual (excluído/renomeado depois do recibo gerado).
+   RELFUNC_GROUPS fica exposto pro PDF individual e pro modal de editar. */
+let RELFUNC_GROUPS={};
 function relFuncaoResumo(list){
   const b=$('#relFuncaoBody');if(!b)return;
   const porNome={};
   state.employees.forEach(e=>{porNome[e.nome.trim().toLowerCase()]=e.funcao||'— sem função —';});
   const grupos={};
   list.forEach(r=>{
-    if(r.tipo==='terceiros'){ (grupos['Terceiros']=grupos['Terceiros']||{tot:0,nomes:new Set()}).tot+=r.total; (r.itens||[]).forEach(it=>grupos['Terceiros'].nomes.add(it.nome)); return; }
+    if(r.tipo==='terceiros'){ const g=grupos['Terceiros']=grupos['Terceiros']||{tot:0,pessoas:{}}; g.tot+=r.total; (r.itens||[]).forEach(it=>{g.pessoas[it.nome]=(g.pessoas[it.nome]||0)+(Number(it.valor)||0);}); return; }
     (r.itens||[]).forEach(it=>{
       const fn=porNome[(it.nome||'').trim().toLowerCase()]||'— sem função —';
-      const g=grupos[fn]=grupos[fn]||{tot:0,nomes:new Set()};
-      g.tot+=Number(it.valor)||0; g.nomes.add(it.nome);
+      const g=grupos[fn]=grupos[fn]||{tot:0,pessoas:{}};
+      const v=Number(it.valor)||0;
+      g.tot+=v; g.pessoas[it.nome]=(g.pessoas[it.nome]||0)+v;
     });
   });
-  const rows=Object.keys(grupos).sort((a,b2)=>grupos[b2].tot-grupos[a].tot);
-  if(!rows.length){b.innerHTML='<tr><td colspan="3"><div class="empty"><b>Sem dados</b></div></td></tr>';return;}
-  b.innerHTML=rows.map(fn=>'<tr><td class="forn">'+esc(fn)+'</td><td class="c mono">'+grupos[fn].nomes.size+'</td><td class="r val">R$ '+fmtBRL(grupos[fn].tot)+'</td></tr>').join('');
+  RELFUNC_GROUPS=grupos;
+  normCfg();
+  const ocultas=state.cfg.funcoesOcultasRel||[];
+  const todas=Object.keys(grupos).sort((a,b2)=>grupos[b2].tot-grupos[a].tot);
+  const rows=todas.filter(fn=>!ocultas.includes(fn));
+  const rowsOcultas=todas.filter(fn=>ocultas.includes(fn));
+  if(!rows.length){b.innerHTML='<tr><td colspan="4"><div class="empty"><b>Sem dados</b></div></td></tr>';}
+  else{
+    b.innerHTML=rows.map(fn=>{
+      const g=grupos[fn];
+      return '<tr><td class="forn">'+esc(fn)+'</td><td class="c mono">'+Object.keys(g.pessoas).length+'</td><td class="r val">R$ '+fmtBRL(g.tot)+'</td>'
+        +'<td class="r"><div class="rowact">'
+        +'<button class="ia" data-relfpdf="'+esc(fn)+'" title="Exportar PDF desta função">📄</button>'
+        +'<button class="ia" data-relfedit="'+esc(fn)+'" title="Editar função de quem está aqui">✎</button>'
+        +'<button class="ia del" data-relfhide="'+esc(fn)+'" title="Ocultar esta função da tabela">✕</button>'
+        +'</div></td></tr>';
+    }).join('');
+  }
+  b.querySelectorAll('[data-relfpdf]').forEach(x=>x.onclick=()=>exportFuncaoPDF(x.dataset.relfpdf));
+  b.querySelectorAll('[data-relfedit]').forEach(x=>x.onclick=()=>abrirEditarFuncaoGrupo(x.dataset.relfedit));
+  b.querySelectorAll('[data-relfhide]').forEach(x=>x.onclick=()=>ocultarFuncaoRel(x.dataset.relfhide));
+  const ocEl=$('#relFuncaoOcultas');
+  if(ocEl){
+    ocEl.innerHTML=rowsOcultas.length?('<span class="sub" style="font-family:var(--sans)">Ocultas — clique pra reexibir: </span>'
+      +rowsOcultas.map(fn=>'<span class="chip" data-relfshow="'+esc(fn)+'" title="Reexibir">'+esc(fn)+' ✕</span>').join('')):'';
+    ocEl.querySelectorAll('[data-relfshow]').forEach(x=>x.onclick=()=>reexibirFuncaoRel(x.dataset.relfshow));
+  }
 }
+function ocultarFuncaoRel(fn){
+  normCfg();
+  if(!state.cfg.funcoesOcultasRel.includes(fn))state.cfg.funcoesOcultasRel.push(fn);
+  persist();renderRel();toast('"'+fn+'" ocultada do relatório','ok');
+}
+function reexibirFuncaoRel(fn){
+  normCfg();
+  state.cfg.funcoesOcultasRel=state.cfg.funcoesOcultasRel.filter(x=>x!==fn);
+  persist();renderRel();
+}
+function abrirEditarFuncaoGrupo(fn){
+  const g=RELFUNC_GROUPS[fn];if(!g)return;
+  $('#funcaoEditTitle').textContent='Função: '+fn;
+  const b=$('#funcaoEditBody');b.innerHTML='';
+  const nomes=Object.keys(g.pessoas).sort((a,b2)=>a.localeCompare(b2,'pt-BR'));
+  nomes.forEach(n=>{
+    const emp=state.employees.find(e=>e.nome.trim().toLowerCase()===n.trim().toLowerCase());
+    const tr=el('tr');
+    if(emp){
+      const cur=emp.funcao||'';
+      let opts='<option value="">— sem função —</option>'+(state.cfg.funcoes||[]).map(x=>'<option'+(x===cur?' selected':'')+'>'+esc(x)+'</option>').join('');
+      if(cur&&!(state.cfg.funcoes||[]).includes(cur))opts+='<option selected>'+esc(cur)+'</option>';
+      tr.innerHTML='<td class="forn">'+esc(titlePt(n))+'</td><td><select class="funcaoEditSel" data-emp="'+emp.id+'">'+opts+'</select></td>';
+    } else {
+      tr.innerHTML='<td class="forn">'+esc(titlePt(n))+'</td><td class="sub">Não encontrado no cadastro atual (nome mudou ou funcionário foi excluído)</td>';
+    }
+    b.appendChild(tr);
+  });
+  $('#funcaoEditModal').classList.add('open');
+}
+function salvarFuncaoEditGrupo(){
+  let n=0;
+  $('#funcaoEditBody').querySelectorAll('select.funcaoEditSel').forEach(sel=>{
+    const emp=state.employees.find(x=>x.id===sel.dataset.emp);
+    if(emp&&emp.funcao!==sel.value){emp.funcao=sel.value;n++;}
+  });
+  if(n)persist();
+  closeAll();renderRel();
+  if($('#v-emp')&&$('#v-emp').classList.contains('on'))renderEmps();
+  toast(n?'Função atualizada':'Nada mudou','ok');
+}
+$('#funcaoEditSave')&&($('#funcaoEditSave').onclick=salvarFuncaoEditGrupo);
 /* ---- reajustes salariais registrados no ano selecionado ---- */
 function relReajustes(ano){
   const b=$('#relReajBody');if(!b)return;
@@ -2440,15 +2525,8 @@ function textoDescEmpr(list){
 /* =================== FIM EMPRÉSTIMOS =================== */
 
 /* ===================== EXPORT PDF RELATÓRIO ===================== */
-function exportRelPDF(key){
-  const r=state.historico[key];if(!r)return;
-  const cfg=state.cfg;
-  const tipo=TIPO_LAB[r.tipo]||r.tipo;
-  const mesNome=MESES[r.mes].charAt(0).toUpperCase()+MESES[r.mes].slice(1);
-  const titulo=tipo+' \u00b7 '+mesNome+' de '+r.ano;
-  const RED='#aa221f', INK='#1d2127', GRAY='#585758';
-
-  let css='*{box-sizing:border-box}'
+function relPdfCSS(RED,INK,GRAY){
+  return '*{box-sizing:border-box}'
     +'body{font-family:Arial,Helvetica,sans-serif;margin:0;color:'+INK+'}'
     +'.wrap{padding:22px 26px}'
     +'.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #dadee3;padding-bottom:14px;position:relative}'
@@ -2468,14 +2546,26 @@ function exportRelPDF(key){
     +'.sub td{background:#f4f5f6 !important;font-weight:bold;border-top:1.5px solid #c8ccd2}'
     +'.grand td{background:'+RED+' !important;color:#fff;font-weight:bold;font-size:12px}'
     +'.foot{margin-top:22px;text-align:center;font-size:10px;color:#9aa1aa;border-top:1px solid #dadee3;padding-top:10px}';
-
-  let html='<div class="wrap">';
-  html+='<div class="head"><img src="'+LOGO+'"><div class="co">'
+}
+function relPdfHead(cfg){
+  return '<div class="head"><img src="'+LOGO+'"><div class="co">'
     +'<div class="nm">RM Estruturas Pr\u00e9-Fabricadas</div>'
     +'<div>'+esc(cfg.razao)+'</div>'
     +'<div>CNPJ '+esc(cfg.cnpj)+'</div>'
     +'<div>'+esc(cfg.endereco)+' \u00b7 '+esc(cfg.cidade)+'</div>'
     +'</div></div>';
+}
+function exportRelPDF(key){
+  const r=state.historico[key];if(!r)return;
+  const cfg=state.cfg;
+  const tipo=TIPO_LAB[r.tipo]||r.tipo;
+  const mesNome=MESES[r.mes].charAt(0).toUpperCase()+MESES[r.mes].slice(1);
+  const titulo=tipo+' \u00b7 '+mesNome+' de '+r.ano;
+  const RED='#aa221f', INK='#1d2127', GRAY='#585758';
+  const css=relPdfCSS(RED,INK,GRAY);
+
+  let html='<div class="wrap">';
+  html+=relPdfHead(cfg);
   html+='<div class="title">Relat\u00f3rio de '+esc(tipo)+'</div>';
   html+='<div class="subttl">'+esc(mesNome)+' de '+r.ano+' \u00b7 gerado em '+new Date().toLocaleDateString('pt-BR')+' '+new Date().toLocaleTimeString('pt-BR').slice(0,5)+'</div>';
 
@@ -2506,6 +2596,32 @@ function exportRelPDF(key){
   const wrap=document.createElement('div');
   wrap.innerHTML='<style>'+css+'</style>'+html;
   const opt={margin:0,filename:('Relatorio_'+titulo).replace(/[^a-z0-9]/gi,'_')+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true},jsPDF:{orientation:'portrait',unit:'mm',format:'a4'}};
+  html2pdf().set(opt).from(wrap).save();
+}
+/* ---- PDF individual por função (aba Relatórios · "Por função") ---- */
+function exportFuncaoPDF(fn){
+  const g=RELFUNC_GROUPS[fn];if(!g)return;
+  const cfg=state.cfg;
+  const ano=+($('#relAno').value||new Date().getFullYear());
+  const RED='#aa221f', INK='#1d2127', GRAY='#585758';
+  const css=relPdfCSS(RED,INK,GRAY);
+
+  let html='<div class="wrap">';
+  html+=relPdfHead(cfg);
+  html+='<div class="title">Relatório por função — '+esc(fn)+'</div>';
+  html+='<div class="subttl">Ano '+ano+' · gerado em '+new Date().toLocaleDateString('pt-BR')+' '+new Date().toLocaleTimeString('pt-BR').slice(0,5)+'</div>';
+
+  const nomes=Object.keys(g.pessoas).sort((a,b)=>g.pessoas[b]-g.pessoas[a]);
+  let t='<table><thead><tr><th>Nome</th><th class="money">Total no ano</th></tr></thead><tbody>';
+  nomes.forEach(n=>{t+='<tr><td>'+esc(titlePt(n))+'</td><td class="money">R$ '+fmtBRL(g.pessoas[n])+'</td></tr>';});
+  t+='</tbody></table>';
+  html+=t;
+  html+='<table style="margin-top:10px"><tr class="grand"><td>TOTAL ('+nomes.length+')</td><td class="money">R$ '+fmtBRL(g.tot)+'</td></tr></table>';
+  html+='<div class="foot">RM Estruturas Pré-Fabricadas · Folha de Pagamento</div></div>';
+
+  const wrap=document.createElement('div');
+  wrap.innerHTML='<style>'+css+'</style>'+html;
+  const opt={margin:0,filename:('Relatorio_Funcao_'+fn+'_'+ano).replace(/[^a-z0-9]/gi,'_')+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true},jsPDF:{orientation:'portrait',unit:'mm',format:'a4'}};
   html2pdf().set(opt).from(wrap).save();
 }
 /* =================== FIM EXPORT PDF =================== */
