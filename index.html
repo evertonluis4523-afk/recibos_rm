@@ -67,6 +67,14 @@ input,textarea,select{font-family:inherit;color:inherit}
 .vtab.on{color:var(--red);border-bottom-color:var(--red)}
 .view{display:none}
 .view.on{display:block}
+.relsubtabs{padding:0 30px;background:#f7f8f9}
+.relpane{display:none}
+.relpane.on{display:block}
+.rel-legend{display:flex;gap:16px;padding:6px 20px 0;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.rel-legend span{display:inline-flex;align-items:center;gap:5px}
+.rel-legend i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.rel-bar-stack{width:100%;max-width:28px;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;min-height:2px}
+.rel-note{font-size:11.5px;color:var(--muted);background:#fafbfc;border:1px solid var(--line-2);border-radius:9px;padding:10px 14px;margin:0 0 14px;line-height:1.5}
 
 /* Dashboard cards */
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid var(--line)}
@@ -627,57 +635,101 @@ table.list td.c,table.list th.c{text-align:center}
 
     <!-- RELATÓRIO -->
     <div class="view" id="v-rel">
+      <div class="viewtabs relsubtabs" id="relSubTabs">
+        <button class="vtab on" data-rv="geral">Visão Geral</button>
+        <button class="vtab" data-rv="custos">Custos &amp; Encargos</button>
+        <button class="vtab" data-rv="funcao">Por Função</button>
+        <button class="vtab" data-rv="reaj">Reajustes</button>
+        <button class="vtab" data-rv="export">Exportar</button>
+      </div>
       <div class="addzone">
         <div class="section-lab">Relatório de valores pagos <span class="ln"></span></div>
         <div class="form-grid">
           <div class="f span3"><span class="lab">Ano</span><select id="relAno"></select></div>
-          <div class="f span5"><span class="lab">Buscar funcionário ou terceiro</span><input id="relBusca" list="relNomesList" placeholder="digite um nome"></div>
+          <div class="f span3"><span class="lab">Tipo</span><select id="relTipoF"><option value="todos">Todos</option><option value="pagamento">Pagamento</option><option value="adiantamento">Adiantamento</option><option value="terceiros">Terceiros</option></select></div>
+          <div class="f span6"><span class="lab">Buscar funcionário ou terceiro</span><input id="relBusca" list="relNomesList" placeholder="digite um nome — filtra os lançamentos abaixo"></div>
           <datalist id="relNomesList"></datalist>
-          <div class="f span4" style="align-self:flex-end">
-            <button class="btn-act dim" id="btnRelCSV" style="width:100%">⬇ Exportar ano (CSV)</button>
-          </div>
         </div>
       </div>
-      <div class="cards" style="grid-template-columns:repeat(4,1fr)">
-        <div class="card"><div class="k"><span class="dotk b"></span>Total no ano</div><div class="v" id="relTotAno">R$ 0,00</div></div>
-        <div class="card atv"><div class="k"><span class="dotk g"></span>Via banco</div><div class="v" id="relTotBanco">R$ 0,00</div></div>
-        <div class="card afa"><div class="k"><span class="dotk w"></span>Em espécie (PF)</div><div class="v" id="relTotPF">R$ 0,00</div></div>
-        <div class="card"><div class="k"><span class="dotk r"></span>Terceiros</div><div class="v" id="relTotTerc">R$ 0,00</div></div>
+
+      <!-- VISÃO GERAL -->
+      <div class="relpane on" id="relp-geral">
+        <div class="cards" style="grid-template-columns:repeat(4,1fr)">
+          <div class="card"><div class="k"><span class="dotk b"></span>Total no ano</div><div class="v" id="relTotAno">R$ 0,00</div></div>
+          <div class="card atv"><div class="k"><span class="dotk g"></span>Via banco</div><div class="v" id="relTotBanco">R$ 0,00</div></div>
+          <div class="card afa"><div class="k"><span class="dotk w"></span>Em espécie (PF)</div><div class="v" id="relTotPF">R$ 0,00</div></div>
+          <div class="card"><div class="k"><span class="dotk r"></span>Terceiros</div><div class="v" id="relTotTerc">R$ 0,00</div></div>
+        </div>
+        <div class="sheetfoot" id="relCompAno" style="margin-top:-6px"></div>
+
+        <div id="relBuscaWrap" style="display:none">
+          <div class="section-lab" style="margin-top:18px">Resumo por pessoa <span class="ln"></span></div>
+          <div id="relBuscaResult"></div>
+        </div>
+
+        <div class="section-lab" style="margin-top:18px">Evolução mensal <span class="ln"></span></div>
+        <div class="rel-chart" id="relChart"></div>
+        <div class="rel-legend"><span><i style="background:var(--ok)"></i>Banco</span><span><i style="background:var(--warn)"></i>Espécie (PF)</span><span><i style="background:var(--red)"></i>Terceiros</span></div>
+
+        <div class="section-lab" style="margin-top:18px">Lançamentos por mês <span class="ln"></span></div>
+        <div class="tbl-wrap">
+          <table class="list">
+            <thead><tr><th>Mês</th><th>Tipo</th><th class="c">Qtd</th><th class="r">Banco</th><th class="r">Espécie (PF)</th><th class="r">Total</th><th class="r">Ações</th></tr></thead>
+            <tbody id="relBody"></tbody>
+          </table>
+        </div>
+        <div class="sheetfoot"><span>Os pagamentos são registrados aqui automaticamente quando você gera os recibos.</span></div>
       </div>
-      <div class="sheetfoot" id="relCompAno" style="margin-top:-6px"></div>
 
-      <div id="relBuscaWrap" style="display:none">
-        <div class="section-lab" style="margin-top:18px">Resumo por pessoa <span class="ln"></span></div>
-        <div id="relBuscaResult"></div>
+      <!-- CUSTOS & ENCARGOS -->
+      <div class="relpane" id="relp-custos">
+        <div class="rel-note">Estes valores vêm dos campos detalhados preenchidos na aba Salários (base, horas extras, benefícios, descontos) no momento em que os pagamentos foram gerados. Alguns campos (horas extras, faltas, plano, INSS, e-consignado) são informativos e nem sempre entram na conta do valor pago — use como referência de composição, não como conferência exata do líquido.</div>
+        <div class="cards" style="grid-template-columns:repeat(4,1fr)">
+          <div class="card"><div class="k"><span class="dotk b"></span>Salário base</div><div class="v" id="relCBase">R$ 0,00</div></div>
+          <div class="card atv"><div class="k"><span class="dotk g"></span>Benefícios</div><div class="v" id="relCBenef">R$ 0,00</div><div class="s">banheiro + almoço + acréscimos</div></div>
+          <div class="card afa"><div class="k"><span class="dotk w"></span>Horas extras (inf.)</div><div class="v" id="relCHe">R$ 0,00</div></div>
+          <div class="card sem"><div class="k"><span class="dotk r"></span>Descontos/Encargos</div><div class="v" id="relCDesc">R$ 0,00</div><div class="s">desc. RM + faltas + plano + INSS + e-consig.</div></div>
+        </div>
+        <div class="section-lab" style="margin-top:18px">Composição por mês <span class="ln"></span></div>
+        <div class="tbl-wrap">
+          <table class="list">
+            <thead><tr><th>Mês</th><th class="r">Base</th><th class="r">Benefícios</th><th class="r">Horas extras</th><th class="r">Descontos</th><th class="r">Líquido pago</th></tr></thead>
+            <tbody id="relCustoBody"></tbody>
+          </table>
+        </div>
       </div>
 
-      <div class="section-lab" style="margin-top:18px">Evolução mensal <span class="ln"></span></div>
-      <div class="rel-chart" id="relChart"></div>
-
-      <div class="section-lab" style="margin-top:18px">Lançamentos por mês <span class="ln"></span></div>
-      <div class="tbl-wrap">
-        <table class="list">
-          <thead><tr><th>Mês</th><th>Tipo</th><th class="c">Qtd</th><th class="r">Banco</th><th class="r">Espécie (PF)</th><th class="r">Total</th><th class="r">Ações</th></tr></thead>
-          <tbody id="relBody"></tbody>
-        </table>
+      <!-- POR FUNÇÃO -->
+      <div class="relpane" id="relp-funcao">
+        <div class="section-lab">Por função <span class="ln"></span></div>
+        <div class="tbl-wrap">
+          <table class="list">
+            <thead><tr><th>Função</th><th class="c">Pessoas</th><th class="r">Total no ano</th><th class="r">Ações</th></tr></thead>
+            <tbody id="relFuncaoBody"></tbody>
+          </table>
+        </div>
+        <div id="relFuncaoOcultas" style="margin-top:8px"></div>
       </div>
-      <div class="sheetfoot"><span>Os pagamentos são registrados aqui automaticamente quando você gera os recibos.</span></div>
 
-      <div class="section-lab" style="margin-top:18px">Por função <span class="ln"></span></div>
-      <div class="tbl-wrap">
-        <table class="list">
-          <thead><tr><th>Função</th><th class="c">Pessoas</th><th class="r">Total no ano</th><th class="r">Ações</th></tr></thead>
-          <tbody id="relFuncaoBody"></tbody>
-        </table>
+      <!-- REAJUSTES -->
+      <div class="relpane" id="relp-reaj">
+        <div class="section-lab">Reajustes salariais do ano <span class="ln"></span></div>
+        <div class="tbl-wrap">
+          <table class="list">
+            <thead><tr><th>Data</th><th>Funcionário</th><th class="r">Salário anterior</th><th class="r">Salário novo</th><th class="r">Variação</th></tr></thead>
+            <tbody id="relReajBody"></tbody>
+          </table>
+        </div>
       </div>
-      <div id="relFuncaoOcultas" style="margin-top:8px"></div>
 
-      <div class="section-lab" style="margin-top:18px">Reajustes salariais do ano <span class="ln"></span></div>
-      <div class="tbl-wrap">
-        <table class="list">
-          <thead><tr><th>Data</th><th>Funcionário</th><th class="r">Salário anterior</th><th class="r">Salário novo</th><th class="r">Variação</th></tr></thead>
-          <tbody id="relReajBody"></tbody>
-        </table>
+      <!-- EXPORTAR -->
+      <div class="relpane" id="relp-export">
+        <div class="section-lab">Exportar dados do ano <span class="ln"></span></div>
+        <div class="form-grid">
+          <div class="f span6"><button class="btn-act dim" id="btnRelCSV" style="width:100%">⬇ Exportar ano (CSV)</button></div>
+          <div class="f span6"><button class="btn-act save" id="btnRelAnualPDF" style="width:100%">📄 PDF anual consolidado</button></div>
+        </div>
+        <div class="sheetfoot"><span>O CSV traz um item por linha (inclui a composição de custo quando disponível). O PDF traz o resumo do ano, os lançamentos por mês, por função e os reajustes, pronto para impressão.</span></div>
       </div>
     </div>
 
@@ -1935,7 +1987,15 @@ function gerarSalario(tipo){
   for(let i=0;i<list.length;i+=2){const f=el('div','folha');let html=reciboHTML(list[i],i+1);if(list[i+1])html+='<div class="cutline"><span>✂ recorte</span></div>'+reciboHTML(list[i+1],i+2);f.innerHTML=html;sc.appendChild(f);}
   const lab=tipo==='adiantamento'?'Adiantamento':'Pagamento',mes=MESES[parseInt($('#salMes').value,10)];
   $('#printInfo').textContent=lab+' · '+mes+'/'+$('#salAno').value+' · '+list.length+' recibo(s) · '+Math.ceil(list.length/2)+' folha(s)';
-  const itens=list.map(e=>({nome:e.nome,doc:e.doc||'',valor:(tipo==='adiantamento'?e.valAdiantamento:e.valPagamento)||0,metodo:e.metodo||'banco',salario:Number(e.salario)||0}));
+  const itens=list.map(e=>{
+    const it={nome:e.nome,doc:e.doc||'',valor:(tipo==='adiantamento'?e.valAdiantamento:e.valPagamento)||0,metodo:e.metodo||'banco',salario:Number(e.salario)||0};
+    if(tipo==='pagamento'){
+      Object.assign(it,{base:Number(e.base)||0,descRM:Number(e.descRM)||0,acresc:Number(e.acresc)||0,banheiro:Number(e.banheiro)||0,almoco:Number(e.almoco)||0,
+        he:Number(e.he)||0,faltas:Number(e.faltas)||0,plano:Number(e.plano)||0,inss:Number(e.inss)||0,econ:Number(e.econ)||0,
+        adicional:Number(e.adicional)||0,desconto:Number(e.desconto)||0});
+    }
+    return it;
+  });
   registrarHistorico(tipo,parseInt($('#salAno').value,10),parseInt($('#salMes').value,10),RCTX.dataISO,itens);
   $('#printOv').classList.add('open');
 }
@@ -2074,9 +2134,38 @@ function renderRel(){
   let tTot=0,tBanco=0,tPF=0,tTerc=0;
   list.forEach(r=>{tTot+=r.total;if(r.tipo==='terceiros')tTerc+=r.total;else{tBanco+=r.banco;tPF+=r.pf;}});
   $('#relTotAno').textContent='R$ '+fmtBRL(tTot);$('#relTotBanco').textContent='R$ '+fmtBRL(tBanco);$('#relTotPF').textContent='R$ '+fmtBRL(tPF);$('#relTotTerc').textContent='R$ '+fmtBRL(tTerc);
-  const b=$('#relBody');b.innerHTML='';
-  if(!list.length){b.innerHTML='<tr><td colspan="7"><div class="empty"><b>Nenhum pagamento registrado em '+ano+'</b>Gere recibos para começar a alimentar o relatório.</div></td></tr>';}
-  else{
+  relBodyRender(relFiltrarLista(list),ano);
+  relChart(ano,list);
+  relComparativo(ano,recs);
+  relFuncaoResumo(list);
+  relCustosResumo(list,ano);
+  relReajustes(ano);
+  relNomesList();
+  relBuscaAplicar();
+}
+$('#relAno') && ($('#relAno').onchange=renderRel);
+$('#relBusca') && ($('#relBusca').oninput=()=>{relBuscaAplicar();relRefreshTable();});
+$('#relTipoF') && ($('#relTipoF').onchange=relRefreshTable);
+
+/* ---- filtro de tipo + busca aplicado só à tabela de lançamentos ---- */
+function relFiltrarLista(list){
+  const tipo=$('#relTipoF')?$('#relTipoF').value:'todos';
+  const q=($('#relBusca')?$('#relBusca').value:'').trim().toLowerCase();
+  return list.filter(r=>{
+    if(tipo!=='todos'&&r.tipo!==tipo)return false;
+    if(q&&!(r.itens||[]).some(it=>(it.nome||'').toLowerCase().includes(q)))return false;
+    return true;
+  });
+}
+function relRefreshTable(){
+  const recs=Object.keys(state.historico||{}).map(k=>({key:k,...state.historico[k]}));
+  const ano=+($('#relAno').value||new Date().getFullYear());
+  const list=recs.filter(r=>r.ano===ano).sort((a,b)=>b.mes-a.mes || (a.tipo>b.tipo?1:-1));
+  relBodyRender(relFiltrarLista(list),ano);
+}
+function relBodyRender(list,ano){
+  const b=$('#relBody');if(!b)return;b.innerHTML='';
+  if(!list.length){b.innerHTML='<tr><td colspan="7"><div class="empty"><b>Nenhum lançamento encontrado em '+ano+'</b>Ajuste o tipo, a busca, ou gere recibos para alimentar o relatório.</div></td></tr>';return;}
   list.forEach(r=>{const mesNome=MESES[r.mes].charAt(0).toUpperCase()+MESES[r.mes].slice(1);const terc=r.tipo==='terceiros';const tr=el('tr');
     tr.innerHTML='<td class="forn">'+mesNome+'</td><td><span class="badge '+(r.tipo==='adiantamento'?'afa':(terc?'':'atv'))+'"><span class="d"></span>'+(TIPO_LAB[r.tipo]||r.tipo)+'</span></td>'+
       '<td class="c mono">'+r.qtd+'</td>'+
@@ -2088,27 +2177,54 @@ function renderRel(){
   b.querySelectorAll('[data-rdet]').forEach(x=>x.onclick=()=>relDetalhes(x.dataset.rdet));
   b.querySelectorAll('[data-rpdf]').forEach(x=>x.onclick=()=>exportRelPDF(x.dataset.rpdf));
   b.querySelectorAll('[data-rdel]').forEach(x=>x.onclick=()=>{const r=state.historico[x.dataset.rdel];if(!confirm('Excluir o registro de '+(TIPO_LAB[r.tipo]||r.tipo)+' de '+MESES[r.mes]+'/'+r.ano+'?'))return;delete state.historico[x.dataset.rdel];persist();renderRel();toast('Registro excluído');});
-  }
-  relChart(ano,list);
-  relComparativo(ano,recs);
-  relFuncaoResumo(list);
-  relReajustes(ano);
-  relNomesList();
-  relBuscaAplicar();
 }
-$('#relAno') && ($('#relAno').onchange=renderRel);
-$('#relBusca') && ($('#relBusca').oninput=relBuscaAplicar);
 
-/* ---- gráfico de evolução mensal ---- */
+/* ---- sub-abas internas da aba Relatório ---- */
+document.querySelectorAll('#relSubTabs .vtab').forEach(x=>x.onclick=()=>{
+  document.querySelectorAll('#relSubTabs .vtab').forEach(y=>y.classList.toggle('on',y===x));
+  document.querySelectorAll('#v-rel .relpane').forEach(p=>p.classList.toggle('on',p.id==='relp-'+x.dataset.rv));
+});
+
+/* ---- gráfico de evolução mensal (empilhado banco/PF/terceiros) ---- */
 function relChart(ano,list){
   const el_=$('#relChart');if(!el_)return;
-  const totais=new Array(12).fill(0);
-  list.forEach(r=>{totais[r.mes]+=r.total;});
+  const banco=new Array(12).fill(0),pf=new Array(12).fill(0),terc=new Array(12).fill(0);
+  list.forEach(r=>{if(r.tipo==='terceiros')terc[r.mes]+=r.total;else{banco[r.mes]+=r.banco;pf[r.mes]+=r.pf;}});
+  const totais=banco.map((v,i)=>v+pf[i]+terc[i]);
   const max=Math.max(1,...totais);
   el_.innerHTML=totais.map((v,i)=>{
-    const h=Math.max(2,Math.round((v/max)*100));
+    const hB=Math.round((banco[i]/max)*100),hP=Math.round((pf[i]/max)*100),hT=Math.round((terc[i]/max)*100);
     const nomeMes=MESES[i].slice(0,3).toUpperCase();
-    return '<div class="rel-bar-col" title="'+MESES[i]+'/'+ano+': R$ '+fmtBRL(v)+'"><div class="rel-bar" style="height:'+h+'%"></div><div class="rel-bar-lab">'+nomeMes+'</div></div>';
+    const segs=(hB>0?'<div style="height:'+hB+'%;background:var(--ok)"></div>':'')+(hP>0?'<div style="height:'+hP+'%;background:var(--warn)"></div>':'')+(hT>0?'<div style="height:'+hT+'%;background:var(--red)"></div>':'');
+    return '<div class="rel-bar-col" title="'+MESES[i]+'/'+ano+': R$ '+fmtBRL(v)+' (Banco R$ '+fmtBRL(banco[i])+' · PF R$ '+fmtBRL(pf[i])+' · Terceiros R$ '+fmtBRL(terc[i])+')"><div class="rel-bar-stack" style="height:'+Math.max(2,Math.round((v/max)*100))+'%">'+(segs||'<div style="height:100%;background:var(--line-2)"></div>')+'</div><div class="rel-bar-lab">'+nomeMes+'</div></div>';
+  }).join('');
+}
+/* ---- composição de custo (base/benefícios/HE/descontos) — só itens de pagamento ---- */
+function relCustosResumo(list,ano){
+  const cBase=$('#relCBase');if(!cBase)return;
+  const porMes=new Array(12).fill(null).map(()=>({base:0,benef:0,he:0,desc:0,liq:0}));
+  let tBase=0,tBenef=0,tHe=0,tDesc=0;
+  list.forEach(r=>{
+    if(r.tipo!=='pagamento')return;
+    const m=porMes[r.mes];
+    (r.itens||[]).forEach(it=>{
+      const base=Number(it.base)||0,benef=(Number(it.acresc)||0)+(Number(it.banheiro)||0)+(Number(it.almoco)||0),he=Number(it.he)||0,
+        desc=(Number(it.descRM)||0)+(Number(it.faltas)||0)+(Number(it.plano)||0)+(Number(it.inss)||0)+(Number(it.econ)||0),liq=Number(it.valor)||0;
+      m.base+=base;m.benef+=benef;m.he+=he;m.desc+=desc;m.liq+=liq;
+      tBase+=base;tBenef+=benef;tHe+=he;tDesc+=desc;
+    });
+  });
+  $('#relCBase').textContent='R$ '+fmtBRL(tBase);
+  $('#relCBenef').textContent='R$ '+fmtBRL(tBenef);
+  $('#relCHe').textContent='R$ '+fmtBRL(tHe);
+  $('#relCDesc').textContent='R$ '+fmtBRL(tDesc);
+  const b=$('#relCustoBody');if(!b)return;
+  const temDados=porMes.some(m=>m.base||m.benef||m.he||m.desc||m.liq);
+  if(!temDados){b.innerHTML='<tr><td colspan="6"><div class="empty"><b>Sem detalhamento em '+ano+'</b>Gere pagamentos pela aba Salários preenchendo base/benefícios para alimentar esta visão.</div></td></tr>';return;}
+  b.innerHTML=porMes.map((m,i)=>{
+    if(!m.base&&!m.benef&&!m.he&&!m.desc&&!m.liq)return '';
+    const nomeMes=MESES[i].charAt(0).toUpperCase()+MESES[i].slice(1);
+    return '<tr><td class="forn">'+nomeMes+'</td><td class="r val">R$ '+fmtBRL(m.base)+'</td><td class="r val">R$ '+fmtBRL(m.benef)+'</td><td class="r val">R$ '+fmtBRL(m.he)+'</td><td class="r val">R$ '+fmtBRL(m.desc)+'</td><td class="r val">R$ '+fmtBRL(m.liq)+'</td></tr>';
   }).join('');
 }
 /* ---- comparação com o ano anterior ---- */
@@ -2270,13 +2386,16 @@ function relExportCSV(){
   const list=relYearRecords(ano);
   if(!list.length){toast('Nenhum lançamento em '+ano+' pra exportar','err');return;}
   const cell=x=>{x=String(x==null?'':x);return /[";\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;};
-  const head=['Mês','Tipo','Nome','Documento','Método/Serviço','Salário','Valor'];
+  const num=v=>v>0?String(v).replace('.',','):'';
+  const head=['Mês','Tipo','Nome','Documento','Método/Serviço','Salário','Valor','Base','Benefícios','Horas extras','Descontos/Encargos'];
   const linhas=[head.map(cell).join(';')];
   list.sort((a,b)=>a.mes-b.mes).forEach(r=>{
     const mesNome=MESES[r.mes].charAt(0).toUpperCase()+MESES[r.mes].slice(1);
     (r.itens||[]).forEach(it=>{
       const metodo=r.tipo==='terceiros'?(it.servico||''):(it.metodo==='pf'?'PF':'Banco');
-      const linha=[mesNome,TIPO_LAB[r.tipo]||r.tipo,it.nome,it.doc||'',metodo,it.salario>0?String(it.salario).replace('.',','):'',String(it.valor||0).replace('.',',')];
+      const benef=(Number(it.acresc)||0)+(Number(it.banheiro)||0)+(Number(it.almoco)||0);
+      const desc=(Number(it.descRM)||0)+(Number(it.faltas)||0)+(Number(it.plano)||0)+(Number(it.inss)||0)+(Number(it.econ)||0);
+      const linha=[mesNome,TIPO_LAB[r.tipo]||r.tipo,it.nome,it.doc||'',metodo,num(it.salario),num(it.valor),num(it.base),num(benef),num(it.he),num(desc)];
       linhas.push(linha.map(cell).join(';'));
     });
   });
@@ -2624,6 +2743,67 @@ function exportFuncaoPDF(fn){
   const opt={margin:0,filename:('Relatorio_Funcao_'+fn+'_'+ano).replace(/[^a-z0-9]/gi,'_')+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true},jsPDF:{orientation:'portrait',unit:'mm',format:'a4'}};
   html2pdf().set(opt).from(wrap).save();
 }
+/* ---- PDF anual consolidado (aba Relatórios · Exportar) ---- */
+function exportRelAnualPDF(){
+  const ano=+($('#relAno').value||new Date().getFullYear());
+  const list=relYearRecords(ano);
+  if(!list.length){toast('Nenhum lançamento em '+ano+' pra exportar','err');return;}
+  const cfg=state.cfg;
+  const RED='#aa221f', INK='#1d2127', GRAY='#585758';
+  const css=relPdfCSS(RED,INK,GRAY);
+
+  let tTot=0,tBanco=0,tPF=0,tTerc=0;
+  list.forEach(r=>{tTot+=r.total;if(r.tipo==='terceiros')tTerc+=r.total;else{tBanco+=r.banco;tPF+=r.pf;}});
+
+  let html='<div class="wrap">';
+  html+=relPdfHead(cfg);
+  html+='<div class="title">Relatório anual consolidado</div>';
+  html+='<div class="subttl">Ano '+ano+' · gerado em '+new Date().toLocaleDateString('pt-BR')+' '+new Date().toLocaleTimeString('pt-BR').slice(0,5)+'</div>';
+
+  html+='<table><thead><tr><th>Resumo</th><th class="money">Valor</th></tr></thead><tbody>'
+    +'<tr><td>Total no ano</td><td class="money">R$ '+fmtBRL(tTot)+'</td></tr>'
+    +'<tr><td>Via banco</td><td class="money">R$ '+fmtBRL(tBanco)+'</td></tr>'
+    +'<tr><td>Em espécie (PF)</td><td class="money">R$ '+fmtBRL(tPF)+'</td></tr>'
+    +'<tr><td>Terceiros</td><td class="money">R$ '+fmtBRL(tTerc)+'</td></tr>'
+    +'</tbody></table>';
+
+  html+='<div class="sec">Lançamentos por mês</div>';
+  let tl='<table><thead><tr><th>Mês</th><th>Tipo</th><th class="center">Qtd</th><th class="money">Banco</th><th class="money">PF</th><th class="money">Total</th></tr></thead><tbody>';
+  list.slice().sort((a,b)=>a.mes-b.mes||(a.tipo>b.tipo?1:-1)).forEach(r=>{
+    const mesNome=MESES[r.mes].charAt(0).toUpperCase()+MESES[r.mes].slice(1),terc=r.tipo==='terceiros';
+    tl+='<tr><td>'+mesNome+'</td><td>'+(TIPO_LAB[r.tipo]||r.tipo)+'</td><td class="center">'+r.qtd+'</td>'
+      +'<td class="money">'+(terc?'—':'R$ '+fmtBRL(r.banco))+'</td><td class="money">'+(terc?'—':'R$ '+fmtBRL(r.pf))+'</td><td class="money">R$ '+fmtBRL(r.total)+'</td></tr>';
+  });
+  html+=tl+'</tbody></table>';
+
+  const nomesFuncoes=Object.keys(RELFUNC_GROUPS).sort((a,b)=>RELFUNC_GROUPS[b].tot-RELFUNC_GROUPS[a].tot);
+  if(nomesFuncoes.length){
+    html+='<div class="sec">Por função</div>';
+    let tf='<table><thead><tr><th>Função</th><th class="center">Pessoas</th><th class="money">Total no ano</th></tr></thead><tbody>';
+    nomesFuncoes.forEach(fn=>{const g=RELFUNC_GROUPS[fn];tf+='<tr><td>'+esc(fn)+'</td><td class="center">'+Object.keys(g.pessoas).length+'</td><td class="money">R$ '+fmtBRL(g.tot)+'</td></tr>';});
+    html+=tf+'</tbody></table>';
+  }
+
+  const reaj=[];
+  state.employees.forEach(e=>{(e.historicoSalario||[]).forEach(h=>{if(h.data&&h.data.slice(0,4)===String(ano))reaj.push({data:h.data,nome:e.nome,anterior:h.anterior||0,novo:h.novo||0,pct:h.pct});});});
+  reaj.sort((a,b)=>a.data.localeCompare(b.data));
+  if(reaj.length){
+    html+='<div class="sec">Reajustes salariais</div>';
+    let tr_='<table><thead><tr><th>Data</th><th>Funcionário</th><th class="money">Anterior</th><th class="money">Novo</th><th class="money">Variação</th></tr></thead><tbody>';
+    reaj.forEach(l=>{const pct=(l.pct===null||l.pct===undefined)?'—':((l.pct>=0?'+':'')+l.pct.toFixed(2).replace('.',',')+'%');
+      tr_+='<tr><td>'+fmtDate(l.data)+'</td><td>'+esc(titlePt(l.nome))+'</td><td class="money">'+(l.anterior>0?'R$ '+fmtBRL(l.anterior):'—')+'</td><td class="money">R$ '+fmtBRL(l.novo)+'</td><td class="money">'+pct+'</td></tr>';});
+    html+=tr_+'</tbody></table>';
+  }
+
+  html+='<table style="margin-top:10px"><tr class="grand"><td>TOTAL GERAL DO ANO</td><td class="money">R$ '+fmtBRL(tTot)+'</td></tr></table>';
+  html+='<div class="foot">RM Estruturas Pré-Fabricadas · Folha de Pagamento</div></div>';
+
+  const wrap=document.createElement('div');
+  wrap.innerHTML='<style>'+css+'</style>'+html;
+  const opt={margin:0,filename:('Relatorio_Anual_'+ano).replace(/[^a-z0-9]/gi,'_')+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true},jsPDF:{orientation:'portrait',unit:'mm',format:'a4'}};
+  html2pdf().set(opt).from(wrap).save();
+}
+$('#btnRelAnualPDF') && ($('#btnRelAnualPDF').onclick=exportRelAnualPDF);
 /* =================== FIM EXPORT PDF =================== */
 
 /* ===================== RECIBOS CLIENTES ===================== */
